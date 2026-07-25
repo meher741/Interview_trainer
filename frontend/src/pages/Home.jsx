@@ -24,6 +24,11 @@ export default function Home() {
         topic: localTopic,
         difficulty: localDifficulty,
         question: res.data,
+        questions: [],
+        weakTopics: [],
+        strongTopics: [],
+        averageScore: 0,
+        questionNumber: 1,
         loading: false,
         error: "",
       }));

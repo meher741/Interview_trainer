@@ -6,6 +6,14 @@ Role: {role}
 Topic: {topic}
 Difficulty: {difficulty}
 
+Weak Topics to focus on: {weak_topics}
+Previous average score: {average_score}
+
+Avoid repeating these previous questions:
+{question_history}
+
+Focus on the weak topics if any exist. Personalize the difficulty based on the average score.
+
 Return ONLY valid JSON with no markdown formatting and no extra text:
 
 {{

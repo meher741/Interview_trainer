@@ -1,6 +1,5 @@
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "../context/InterviewContext";
-import { generateQuestion } from "../services/api";
 
 function scoreClass(score) {
   if (score >= 9) return "excellent";
@@ -23,33 +22,45 @@ function scoreColor(score) {
   return "#e74c3c";
 }
 
+function coachingMessage(state) {
+  const s = state.averageScore;
+  const weak = state.weakTopics;
+  if (!state.questions.length) return "";
+
+  if (s >= 8 && weak.length === 0) {
+    return "Excellent work! You've mastered this topic. Moving to harder questions.";
+  }
+  if (s >= 6 && weak.length <= 1) {
+    return "Good progress! Let's keep pushing with a few more questions.";
+  }
+  if (weak.length > 0) {
+    return `You struggled with ${weak.slice(0, 2).join(" and ")}. Let's practice more in that area before increasing difficulty.`;
+  }
+  return "Keep going! Consistency is key.";
+}
+
 export default function Feedback() {
   const { state, setState } = useInterview();
   const navigate = useNavigate();
   const e = state.evaluation;
 
-  async function handleNext() {
-    setState((s) => ({ ...s, loading: true, error: "" }));
-    try {
-      const nextDiff = e?.next_difficulty || state.difficulty;
-      const res = await generateQuestion(state.role, state.topic, nextDiff);
-      setState((s) => ({
-        ...s,
-        question: res.data,
-        difficulty: nextDiff,
-        questionNumber: s.questionNumber + 1,
-        answer: "",
-        evaluation: null,
-        loading: false,
-        error: "",
-      }));
-    } catch {
-      setState((s) => ({
-        ...s,
-        loading: false,
-        error: "Unable to generate question.",
-      }));
-    }
+  function handleNext() {
+    setState((s) => ({ ...s, evaluation: null, error: "" }));
+    navigate("/question");
+  }
+
+  function handleFinish() {
+    setState((s) => ({
+      ...s,
+      question: null,
+      evaluation: null,
+      questions: [],
+      weakTopics: [],
+      strongTopics: [],
+      averageScore: 0,
+      questionNumber: 1,
+    }));
+    navigate("/");
   }
 
   if (!e) {
@@ -94,6 +105,10 @@ export default function Feedback() {
         </div>
       </div>
 
+      <div className="coaching-message">
+        {coachingMessage(state)}
+      </div>
+
       <div className="feedback-section">
         <h2>Strengths</h2>
         <ul className="strengths">
@@ -129,14 +144,30 @@ export default function Feedback() {
 
       <div className="meta-row">
         <div><strong>Confidence:</strong> <span className={`confidence ${e.confidence.toLowerCase()}`}>{e.confidence}</span></div>
-        <div><strong>Next Difficulty:</strong> <span className="badge">{e.next_difficulty}</span></div>
+        <div><strong>Next:</strong> <span className="badge">{e.next_difficulty}</span></div>
       </div>
 
+      {state.questions.length > 0 && (
+        <div className="stats-row">
+          <div><strong>Avg Score:</strong> {state.averageScore}</div>
+          <div><strong>Questions:</strong> {state.questions.length}</div>
+          {state.weakTopics.length > 0 && (
+            <div><strong>Weak Areas:</strong> {state.weakTopics.slice(0, 3).join(", ")}</div>
+          )}
+        </div>
+      )}
+
       <div className="actions">
-        <button className="btn" onClick={handleNext}>
-          Next Question ({e.next_difficulty})
-        </button>
-        <button className="btn btn-secondary" onClick={() => navigate("/")}>
+        {state.questionNumber < 5 ? (
+          <button className="btn" onClick={handleNext}>
+            Next Question
+          </button>
+        ) : (
+          <button className="btn" onClick={handleFinish}>
+            See Final Results
+          </button>
+        )}
+        <button className="btn btn-secondary" onClick={handleFinish}>
           End Interview
         </button>
       </div>

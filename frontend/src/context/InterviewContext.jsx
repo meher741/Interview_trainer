@@ -11,7 +11,10 @@ export function InterviewProvider({ children }) {
     questionNumber: 1,
     answer: "",
     evaluation: null,
-    history: [],
+    questions: [],
+    weakTopics: [],
+    strongTopics: [],
+    averageScore: 0,
     loading: false,
     error: "",
   });

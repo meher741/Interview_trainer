@@ -13,6 +13,15 @@ export async function generateQuestion(role, topic, difficulty) {
   return data;
 }
 
+export async function generateNextQuestion(role, topic, questions) {
+  const { data } = await api.post("/generate-next-question", {
+    role,
+    topic,
+    questions,
+  });
+  return data;
+}
+
 export async function evaluateAnswer(question, expectedTopics, answer) {
   const { data } = await api.post("/evaluate-answer", {
     question,

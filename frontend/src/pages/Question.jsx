@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "../context/InterviewContext";
-import { generateQuestion, evaluateAnswer } from "../services/api";
+import { generateQuestion, generateNextQuestion, evaluateAnswer } from "../services/api";
 
 export default function Question() {
   const { state, setState } = useInterview();
@@ -9,14 +9,36 @@ export default function Question() {
   const q = state.question;
   const [answer, setAnswer] = useState("");
 
-  async function handleNext() {
+  async function loadNextQuestion() {
+    setState((s) => ({ ...s, loading: true, error: "" }));
+    try {
+      const res = await generateNextQuestion(state.role, state.topic, state.questions);
+      setState((s) => ({
+        ...s,
+        question: res.data.question,
+        difficulty: res.data.current_difficulty,
+        questionNumber: res.data.question_number,
+        weakTopics: res.data.weak_topics,
+        strongTopics: res.data.strong_topics,
+        averageScore: res.data.average_score,
+        answer: "",
+        loading: false,
+        error: "",
+      }));
+      setAnswer("");
+    } catch {
+      setState((s) => ({ ...s, loading: false, error: "Unable to generate question." }));
+    }
+  }
+
+  async function handleFirstQuestion() {
     setState((s) => ({ ...s, loading: true, error: "" }));
     try {
       const res = await generateQuestion(state.role, state.topic, state.difficulty);
       setState((s) => ({
         ...s,
         question: res.data,
-        questionNumber: s.questionNumber + 1,
+        questionNumber: 1,
         answer: "",
         loading: false,
         error: "",
@@ -35,19 +57,18 @@ export default function Question() {
     setState((s) => ({ ...s, loading: true, error: "" }));
     try {
       const res = await evaluateAnswer(q.question, q.expected_topics, answer);
+      const entry = {
+        question: q.question,
+        difficulty: state.difficulty,
+        score: res.data.score,
+        expected_topics: q.expected_topics,
+        missing_topics: res.data.missing_topics,
+      };
       setState((s) => ({
         ...s,
         evaluation: res.data,
         answer,
-        history: [
-          ...s.history,
-          {
-            question: q.question,
-            answer,
-            score: res.data.score,
-            difficulty: q.difficulty,
-          },
-        ],
+        questions: [...s.questions, entry],
         loading: false,
       }));
       navigate("/feedback");
@@ -56,11 +77,14 @@ export default function Question() {
     }
   }
 
-  if (!q) {
+  const progress = Math.min((state.questionNumber - 1) / 5 * 100, 100);
+
+  if (!q && !state.loading) {
     return (
       <div className="question-page">
         <p>No question loaded.</p>
-        <button className="btn" onClick={() => navigate("/")}>Go Home</button>
+        <button className="btn" onClick={handleFirstQuestion}>Start</button>
+        <button className="btn btn-secondary" onClick={() => navigate("/")}>Go Home</button>
       </div>
     );
   }
@@ -68,16 +92,29 @@ export default function Question() {
   if (state.loading) {
     return (
       <div className="question-page">
-        <div className="loading">Evaluating your answer...</div>
+        <div className="loading">Generating personalized question...</div>
       </div>
     );
   }
 
   return (
     <div className="question-page">
+      <div className="progress-section">
+        <div className="progress-label">Question {state.questionNumber} / 5</div>
+        <div className="progress-bar-bg">
+          <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+
+      {state.weakTopics.length > 0 && (
+        <div className="coaching-banner">
+          Focus area: <strong>{state.weakTopics.slice(0, 2).join(", ")}</strong>
+        </div>
+      )}
+
       <div className="question-header">
         <span>Question {state.questionNumber}</span>
-        <span className="badge">{q.difficulty}</span>
+        <span className="badge">{state.difficulty}</span>
       </div>
 
       <div className="question-text">{q.question}</div>
@@ -103,9 +140,6 @@ export default function Question() {
       <div className="actions">
         <button className="btn" onClick={handleSubmit}>
           Submit Answer
-        </button>
-        <button className="btn btn-secondary" onClick={handleNext}>
-          Skip Question
         </button>
         <button className="btn btn-secondary" onClick={() => navigate("/")}>
           End Interview
