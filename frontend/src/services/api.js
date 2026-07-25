@@ -12,3 +12,12 @@ export async function generateQuestion(role, topic, difficulty) {
   });
   return data;
 }
+
+export async function evaluateAnswer(question, expectedTopics, answer) {
+  const { data } = await api.post("/evaluate-answer", {
+    question,
+    expected_topics: expectedTopics,
+    answer,
+  });
+  return data;
+}

@@ -9,6 +9,9 @@ export function InterviewProvider({ children }) {
     difficulty: "Easy",
     question: null,
     questionNumber: 1,
+    answer: "",
+    evaluation: null,
+    history: [],
     loading: false,
     error: "",
   });

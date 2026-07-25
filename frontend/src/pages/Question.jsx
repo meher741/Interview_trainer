@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "../context/InterviewContext";
-import { generateQuestion } from "../services/api";
+import { generateQuestion, evaluateAnswer } from "../services/api";
 
 export default function Question() {
   const { state, setState } = useInterview();
   const navigate = useNavigate();
   const q = state.question;
+  const [answer, setAnswer] = useState("");
 
   async function handleNext() {
     setState((s) => ({ ...s, loading: true, error: "" }));
@@ -15,11 +17,42 @@ export default function Question() {
         ...s,
         question: res.data,
         questionNumber: s.questionNumber + 1,
+        answer: "",
         loading: false,
         error: "",
       }));
+      setAnswer("");
     } catch {
       setState((s) => ({ ...s, loading: false, error: "Unable to generate question." }));
+    }
+  }
+
+  async function handleSubmit() {
+    if (!answer.trim()) {
+      setState((s) => ({ ...s, error: "Please enter your answer." }));
+      return;
+    }
+    setState((s) => ({ ...s, loading: true, error: "" }));
+    try {
+      const res = await evaluateAnswer(q.question, q.expected_topics, answer);
+      setState((s) => ({
+        ...s,
+        evaluation: res.data,
+        answer,
+        history: [
+          ...s.history,
+          {
+            question: q.question,
+            answer,
+            score: res.data.score,
+            difficulty: q.difficulty,
+          },
+        ],
+        loading: false,
+      }));
+      navigate("/feedback");
+    } catch {
+      setState((s) => ({ ...s, loading: false, error: "Unable to evaluate answer." }));
     }
   }
 
@@ -35,7 +68,7 @@ export default function Question() {
   if (state.loading) {
     return (
       <div className="question-page">
-        <div className="loading">Generating Question...</div>
+        <div className="loading">Evaluating your answer...</div>
       </div>
     );
   }
@@ -59,11 +92,20 @@ export default function Question() {
         <p>{q.hint}</p>
       </details>
 
-      <textarea className="answer-box" rows={5} placeholder="Type your answer here..." />
+      <textarea
+        className="answer-box"
+        rows={5}
+        placeholder="Type your answer here..."
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+      />
 
       <div className="actions">
-        <button className="btn" onClick={handleNext}>
-          {state.loading ? "Generating..." : "Next Question"}
+        <button className="btn" onClick={handleSubmit}>
+          Submit Answer
+        </button>
+        <button className="btn btn-secondary" onClick={handleNext}>
+          Skip Question
         </button>
         <button className="btn btn-secondary" onClick={() => navigate("/")}>
           End Interview
