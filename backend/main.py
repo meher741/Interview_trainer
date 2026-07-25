@@ -1,25 +1,41 @@
 from dotenv import load_dotenv
+import os
+
+# Load environment variables from the .env file in the backend directory
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+
+from database import init_db
 from routes.ai import router as ai_router
 from routes.question import router as question_router
 from routes.evaluation import router as evaluation_router
 from routes.adaptive import router as adaptive_router
 from routes.dashboard import router as dashboard_router
+from routes.auth import router as auth_router
 
-load_dotenv()
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_db()
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
 
+app.include_router(auth_router)
 app.include_router(ai_router)
 app.include_router(question_router)
 app.include_router(evaluation_router)

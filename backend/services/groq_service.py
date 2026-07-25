@@ -8,7 +8,7 @@ API_KEY = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=API_KEY)
 
 
-def ask_gemini(prompt: str) -> str:
+def ask_groq(prompt: str) -> str:
     if not prompt or not prompt.strip():
         raise ValueError("Prompt cannot be empty")
 

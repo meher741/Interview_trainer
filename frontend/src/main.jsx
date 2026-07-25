@@ -1,7 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-3react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { InterviewProvider } from "./context/InterviewContext";
 import { AuthProvider } from "./context/AuthContext";

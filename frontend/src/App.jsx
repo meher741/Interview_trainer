@@ -19,10 +19,10 @@ export default function App() {
         </div>
       </nav>
       <Routes>
-        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route element={<PrivateRoute>}>
+        <Route element={<PrivateRoute />}>
+          <Route path="/" element={<Home />} />
           <Route path="/question" element={<Question />} />
           <Route path="/feedback" element={<Feedback />} />
           <Route

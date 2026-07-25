@@ -1,22 +1,26 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from models.evaluation_models import EvaluationRequest
-from services.evaluation_service import evaluate_answer
+from services.evaluation_service import evaluate_answer as evaluate
 
 router = APIRouter()
 
 
 @router.post("/evaluate-answer")
-def evaluate_answer_route(body: EvaluationRequest):
+def evaluate_answer(body: dict):
     try:
-        data = evaluate_answer(body.question, body.expected_topics, body.answer)
+        question = body.get("question")
+        expected_topics = body.get("expected_topics", [])
+        answer = body.get("answer")
+        if not question or not answer:
+            raise ValueError("Question and answer are required")
+        data = evaluate(question, expected_topics, answer)
         return {"success": True, "data": data}
     except ValueError as e:
         return JSONResponse(
             status_code=400,
             content={"success": False, "message": str(e)},
         )
-    except Exception:
+    except Exception as e:
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": "Unable to evaluate answer."},

@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from services.gemini_service import ask_gemini
+from services.groq_service import ask_groq
 
 router = APIRouter()
 
@@ -13,7 +13,7 @@ class PromptRequest(BaseModel):
 @router.post("/test-ai")
 def test_ai(body: PromptRequest):
     try:
-        response = ask_gemini(body.prompt)
+        response = ask_groq(body.prompt)
         return {"success": True, "data": {"response": response}}
     except ValueError as e:
         return JSONResponse(

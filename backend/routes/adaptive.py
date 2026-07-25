@@ -1,11 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from models.interview_session import InterviewSession, SessionQuestion
 from services.skill_analyzer import analyze
 from services.question_service import generate_personalized_question
-from ..auth import verify_token
 
 router = APIRouter()
 
@@ -28,7 +27,7 @@ class NextQuestionRequest(BaseModel):
 
 
 @router.post("/generate-next-question")
-def generate_next_question(body: NextQuestionRequest, user: dict = Depends(verify_token)):
+def generate_next_question(body: NextQuestionRequest):
     try:
         session = InterviewSession(
             role=body.role,
@@ -56,7 +55,7 @@ def generate_next_question(body: NextQuestionRequest, user: dict = Depends(verif
             role=session.role,
             topic=session.topic,
             difficulty=user_difficulty,
-            weak_skills=session.weak_topics or [session.topic],
+            weak_topics=session.weak_topics or [session.topic],
             average_score=session.average_score,
             question_history=session.question_history,
             used_categories=all_used,
@@ -78,7 +77,7 @@ def generate_next_question(body: NextQuestionRequest, user: dict = Depends(verif
             status_code=400,
             content={"success": False, "message": str(e)},
         )
-    except Exception:
+    except Exception as e:
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": "Unable to generate next question."},

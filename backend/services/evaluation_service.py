@@ -1,6 +1,6 @@
 import os
 import json
-from services.gemini_service import ask_gemini
+from services.groq_service import ask_groq
 
 PROMPT_PATH = os.path.join(
     os.path.dirname(__file__), "..", "prompts", "evaluation_prompt.txt"
@@ -21,7 +21,7 @@ def evaluate_answer(question: str, expected_topics: list, answer: str) -> dict:
         raise ValueError("Please enter your answer.")
 
     prompt = _load_prompt(question, expected_topics, answer)
-    raw = ask_gemini(prompt)
+    raw = ask_groq(prompt)
 
     cleaned = raw.strip()
     if cleaned.startswith("```"):

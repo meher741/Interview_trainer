@@ -156,7 +156,7 @@ export default function Feedback() {
         ) : (
           <button className="btn btn-primary" onClick={handleFinish}>📊 See Full Report</button>
         )}
-        <button className="btn btn-outline" onClick={handleEndEarly}>
+        <button className="btn btn-destructive" onClick={handleEndEarly}>
           {state.questionNumber < 5 ? "End & See Report" : "End Interview"}
         </button>
       </div>

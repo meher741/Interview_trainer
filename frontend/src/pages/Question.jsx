@@ -251,7 +251,7 @@ export default function Question() {
         <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
           {submitting ? "⏳ Evaluating..." : "✅ Submit Answer"}
         </button>
-        <button className="btn btn-outline" onClick={() => navigate("/")}>
+        <button className="btn btn-destructive" onClick={() => navigate("/")}>
           ✋ End Interview
         </button>
       </div>

@@ -1,6 +1,6 @@
 import os
 import json
-from services.gemini_service import ask_gemini
+from services.groq_service import ask_groq
 
 PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "prompts", "question_prompt.txt")
 
@@ -40,7 +40,7 @@ def _parse_question(raw):
 
 def generate_question(role, topic, difficulty, used_categories=None):
     prompt = _load_prompt(role, topic, difficulty, used_categories=used_categories)
-    raw = ask_gemini(prompt)
+    raw = ask_groq(prompt)
     return _parse_question(raw)
 
 
@@ -52,5 +52,5 @@ def generate_personalized_question(role, topic, difficulty, weak_topics, average
         question_history=question_history,
         used_categories=used_categories,
     )
-    raw = ask_gemini(prompt)
+    raw = ask_groq(prompt)
     return _parse_question(raw)

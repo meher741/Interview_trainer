@@ -1,6 +1,6 @@
 import os
 import json
-from services.gemini_service import ask_gemini
+from services.groq_service import ask_groq
 
 PROMPT = """You are a career coach recommending learning resources.
 
@@ -19,7 +19,7 @@ Return ONLY valid JSON:
 
 def recommend_resources(weak_topics: list[str]) -> dict:
     prompt = PROMPT.format(weak_topics=", ".join(weak_topics))
-    raw = ask_gemini(prompt)
+    raw = ask_groq(prompt)
 
     cleaned = raw.strip()
     if cleaned.startswith("```"):

@@ -2,7 +2,7 @@ import os
 import json
 from models.interview_session import SessionQuestion
 from services.analytics_service import calculate
-from services.gemini_service import ask_gemini
+from services.groq_service import ask_groq
 
 PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "prompts", "report_prompt.txt")
 
@@ -46,7 +46,7 @@ def generate_report(role: str, topic: str, questions: list[SessionQuestion]) -> 
         topic_scores=_build_topic_scores(questions),
     )
 
-    raw = ask_gemini(prompt)
+    raw = ask_groq(prompt)
     cleaned = raw.strip()
     if cleaned.startswith("```"):
         cleaned = cleaned.split("\n", 1)[-1]

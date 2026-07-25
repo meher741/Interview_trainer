@@ -1,24 +1,46 @@
 import axios from "axios";
-import { auth } from "../firebase";
 
 const api = axios.create({
   baseURL: "http://127.0.0.1:8000",
 });
 
-// Request interceptor to attach Firebase ID token
-api.interceptors.request.use(
-  async (config) => {
-    const user = auth.currentUser;
-    if (user) {
-      const token = await user.getIdToken();
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+let accessToken = null;
+
+export function setAccessToken(token) {
+  accessToken = token;
+  if (token) {
+    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common["Authorization"];
   }
-);
+}
+
+export async function signup(email, password) {
+  const { data } = await api.post("/auth/signup", { email, password });
+  if (data.access_token) {
+    setAccessToken(data.access_token);
+  }
+  return data;
+}
+
+export async function login(email, password) {
+  const { data } = await api.post("/auth/login", { email, password });
+  if (data.access_token) {
+    setAccessToken(data.access_token);
+  }
+  return data;
+}
+
+export async function logout() {
+  const { data } = await api.post("/auth/logout");
+  setAccessToken(null);
+  return data;
+}
+
+export async function getMe() {
+  const { data } = await api.get("/auth/me");
+  return data;
+}
 
 export async function generateQuestion(role, topic, difficulty, usedCategories) {
   const { data } = await api.post("/generate-question", { role, topic, difficulty, used_categories: usedCategories });
