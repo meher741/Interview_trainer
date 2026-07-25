@@ -50,17 +50,25 @@ export default function Feedback() {
   }
 
   function handleFinish() {
-    setState((s) => ({
-      ...s,
-      question: null,
-      evaluation: null,
-      questions: [],
-      weakTopics: [],
-      strongTopics: [],
-      averageScore: 0,
-      questionNumber: 1,
-    }));
-    navigate("/");
+    navigate("/dashboard");
+  }
+
+  function handleEndEarly() {
+    if (state.questions.length > 0) {
+      navigate("/dashboard");
+    } else {
+      setState((s) => ({
+        ...s,
+        question: null,
+        evaluation: null,
+        questions: [],
+        weakTopics: [],
+        strongTopics: [],
+        averageScore: 0,
+        questionNumber: 1,
+      }));
+      navigate("/");
+    }
   }
 
   if (!e) {
@@ -167,8 +175,8 @@ export default function Feedback() {
             See Final Results
           </button>
         )}
-        <button className="btn btn-secondary" onClick={handleFinish}>
-          End Interview
+        <button className="btn btn-secondary" onClick={handleEndEarly}>
+          {state.questionNumber < 5 ? "End & See Report" : "End Interview"}
         </button>
       </div>
 
