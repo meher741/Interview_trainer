@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useInterview } from "../context/InterviewContext";
 import { generateQuestion, generateNextQuestion, evaluateAnswer } from "../services/api";
 
@@ -8,6 +9,18 @@ export default function Question() {
   const navigate = useNavigate();
   const q = state.question;
   const [answer, setAnswer] = useState("");
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  function formatTime(sec) {
+    const m = String(Math.floor(sec / 60)).padStart(2, "0");
+    const s = String(sec % 60).padStart(2, "0");
+    return `${m}:${s}`;
+  }
 
   async function loadNextQuestion() {
     setState((s) => ({ ...s, loading: true, error: "" }));
@@ -26,8 +39,11 @@ export default function Question() {
         error: "",
       }));
       setAnswer("");
+      setElapsed(0);
+      toast.success("Personalized question ready!");
     } catch {
       setState((s) => ({ ...s, loading: false, error: "Unable to generate question." }));
+      toast.error("Failed to generate question");
     }
   }
 
@@ -44,6 +60,8 @@ export default function Question() {
         error: "",
       }));
       setAnswer("");
+      setElapsed(0);
+      toast.success("Question generated!");
     } catch {
       setState((s) => ({ ...s, loading: false, error: "Unable to generate question." }));
     }
@@ -52,6 +70,7 @@ export default function Question() {
   async function handleSubmit() {
     if (!answer.trim()) {
       setState((s) => ({ ...s, error: "Please enter your answer." }));
+      toast.error("Please enter your answer");
       return;
     }
     setState((s) => ({ ...s, loading: true, error: "" }));
@@ -71,9 +90,11 @@ export default function Question() {
         questions: [...s.questions, entry],
         loading: false,
       }));
+      toast.success("Answer evaluated!");
       navigate("/feedback");
     } catch {
       setState((s) => ({ ...s, loading: false, error: "Unable to evaluate answer." }));
+      toast.error("Failed to evaluate answer");
     }
   }
 
@@ -81,18 +102,24 @@ export default function Question() {
 
   if (!q && !state.loading) {
     return (
-      <div className="question-page">
-        <p>No question loaded.</p>
-        <button className="btn" onClick={handleFirstQuestion}>Start</button>
-        <button className="btn btn-secondary" onClick={() => navigate("/")}>Go Home</button>
+      <div className="page-card">
+        <div className="empty-state">
+          <div className="empty-icon">🎯</div>
+          <h2>No Interview Started</h2>
+          <p>Start your first AI interview to begin.</p>
+          <button className="btn" onClick={handleFirstQuestion}>Start</button>
+        </div>
       </div>
     );
   }
 
   if (state.loading) {
     return (
-      <div className="question-page">
-        <div className="loading">Generating personalized question...</div>
+      <div className="page-card">
+        <div className="loading">
+          <div className="spinner" />
+          <p>🤖 AI is generating your question...</p>
+        </div>
       </div>
     );
   }
@@ -100,7 +127,10 @@ export default function Question() {
   return (
     <div className="question-page">
       <div className="progress-section">
-        <div className="progress-label">Question {state.questionNumber} / 5</div>
+        <div className="progress-row">
+          <span className="progress-label">Question {state.questionNumber} / 5</span>
+          <span className="timer">⏱ {formatTime(elapsed)}</span>
+        </div>
         <div className="progress-bar-bg">
           <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
         </div>
@@ -108,24 +138,26 @@ export default function Question() {
 
       {state.weakTopics.length > 0 && (
         <div className="coaching-banner">
-          Focus area: <strong>{state.weakTopics.slice(0, 2).join(", ")}</strong>
+          🎯 Focus area: <strong>{state.weakTopics.slice(0, 2).join(", ")}</strong>
         </div>
       )}
 
-      <div className="question-header">
-        <span>Question {state.questionNumber}</span>
-        <span className="badge">{state.difficulty}</span>
-      </div>
-
-      <div className="question-text">{q.question}</div>
-
-      <div className="meta">
-        <div><strong>Expected Time:</strong> {q.estimated_time}</div>
-        <div><strong>Expected Topics:</strong> {q.expected_topics.join(", ")}</div>
+      <div className="question-card">
+        <div className="question-card-header">
+          <span className="question-label">Question {state.questionNumber}</span>
+          <span className={`badge badge-${state.difficulty.toLowerCase()}`}>
+            {state.difficulty === "Easy" ? "🟢" : state.difficulty === "Medium" ? "🟡" : "🔴"} {state.difficulty}
+          </span>
+        </div>
+        <div className="question-text">{q.question}</div>
+        <div className="question-meta">
+          <div>⏱ <strong>{q.estimated_time}</strong></div>
+          <div>📚 <strong>Topics:</strong> {q.expected_topics.join(", ")}</div>
+        </div>
       </div>
 
       <details className="hint-box">
-        <summary>Hint</summary>
+        <summary>💡 Hint</summary>
         <p>{q.hint}</p>
       </details>
 
@@ -138,15 +170,15 @@ export default function Question() {
       />
 
       <div className="actions">
-        <button className="btn" onClick={handleSubmit}>
+        <button className="btn btn-primary" onClick={handleSubmit}>
           Submit Answer
         </button>
-        <button className="btn btn-secondary" onClick={() => navigate("/")}>
+        <button className="btn btn-outline" onClick={() => navigate("/")}>
           End Interview
         </button>
       </div>
 
-      {state.error && <p className="error">{state.error}</p>}
+      {state.error && <div className="error-box">{state.error}</div>}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useInterview } from "../context/InterviewContext";
 import { generateQuestion } from "../services/api";
 
@@ -32,57 +33,62 @@ export default function Home() {
         loading: false,
         error: "",
       }));
+      toast.success("Question generated!");
       navigate("/question");
     } catch {
-      setState((s) => ({
-        ...s,
-        loading: false,
-        error: "Unable to generate question.",
-      }));
+      setState((s) => ({ ...s, loading: false, error: "Unable to generate question." }));
+      toast.error("Failed to generate question");
     }
   }
 
   return (
     <div className="home">
-      <h1>AI Interview Coach</h1>
-
-      <div className="form-group">
-        <label>Select Role</label>
-        <select value={localRole} onChange={(e) => setLocalRole(e.target.value)}>
-          {ROLES.map((r) => <option key={r}>{r}</option>)}
-        </select>
+      <div className="hero-section">
+        <div className="hero-icon">🎯</div>
+        <h1>InterviewIQ</h1>
+        <p className="hero-subtitle">AI-Powered Personalized Interview Coach</p>
+        <p className="hero-desc">Practice • Learn • Improve</p>
       </div>
 
-      <div className="form-group">
-        <label>Select Topic</label>
-        <select value={localTopic} onChange={(e) => setLocalTopic(e.target.value)}>
-          {TOPICS.map((t) => <option key={t}>{t}</option>)}
-        </select>
-      </div>
-
-      <div className="form-group">
-        <label>Difficulty</label>
-        <div className="radio-group">
-          {DIFFICULTIES.map((d) => (
-            <label key={d} className="radio">
-              <input
-                type="radio"
-                name="difficulty"
-                value={d}
-                checked={localDifficulty === d}
-                onChange={(e) => setLocalDifficulty(e.target.value)}
-              />
-              {d}
-            </label>
-          ))}
+      <div className="setup-card">
+        <div className="form-group">
+          <label>📋 Select Role</label>
+          <select value={localRole} onChange={(e) => setLocalRole(e.target.value)}>
+            {ROLES.map((r) => <option key={r}>{r}</option>)}
+          </select>
         </div>
+
+        <div className="form-group">
+          <label>📚 Select Topic</label>
+          <select value={localTopic} onChange={(e) => setLocalTopic(e.target.value)}>
+            {TOPICS.map((t) => <option key={t}>{t}</option>)}
+          </select>
+        </div>
+
+        <div className="form-group">
+          <label>🎯 Difficulty</label>
+          <div className="radio-group">
+            {DIFFICULTIES.map((d) => (
+              <label key={d} className={`radio ${localDifficulty === d ? "active" : ""}`}>
+                <input
+                  type="radio"
+                  name="difficulty"
+                  value={d}
+                  checked={localDifficulty === d}
+                  onChange={(e) => setLocalDifficulty(e.target.value)}
+                />
+                {d === "Easy" ? "🟢" : d === "Medium" ? "🟡" : "🔴"} {d}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <button className="btn btn-start" onClick={handleStart} disabled={state.loading}>
+          {state.loading ? "⏳ Generating..." : "🚀 Start Interview"}
+        </button>
+
+        {state.error && <div className="error-box">{state.error}</div>}
       </div>
-
-      <button className="btn" onClick={handleStart} disabled={state.loading}>
-        {state.loading ? "Generating..." : "Start Interview"}
-      </button>
-
-      {state.error && <p className="error">{state.error}</p>}
     </div>
   );
 }
