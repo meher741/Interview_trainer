@@ -1,9 +1,12 @@
-import { Routes, Route, Link } from "react-router-dom";
+import { Routes, Route, Link, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
 import Question from "./pages/Question";
 import Feedback from "./pages/Feedback";
 import Dashboard from "./pages/Dashboard";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 import ErrorBoundary from "./components/ErrorBoundary";
+import PrivateRoute from "./components/PrivateRoute";
 
 export default function App() {
   return (
@@ -17,9 +20,18 @@ export default function App() {
       </nav>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/question" element={<Question />} />
-        <Route path="/feedback" element={<Feedback />} />
-        <Route path="/dashboard" element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route element={<PrivateRoute>}>
+          <Route path="/question" element={<Question />} />
+          <Route path="/feedback" element={<Feedback />} />
+          <Route
+            path="/dashboard"
+            element={<ErrorBoundary><Dashboard /></ErrorBoundary>}
+          />
+        </Route>
+        {/* Redirect to home if none of the above match */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <footer className="footer">
         <p>🎯 InterviewIQ — AI-Powered Interview Coach</p>

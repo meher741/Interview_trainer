@@ -1,13 +1,14 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from models.question_models import QuestionRequest
 from services.question_service import generate_question
+from ..auth import verify_token
 
 router = APIRouter()
 
 
 @router.post("/generate-question")
-def generate_question_route(body: QuestionRequest):
+def generate_question_route(body: QuestionRequest, user: dict = Depends(verify_token)):
     try:
         data = generate_question(body.role, body.topic, body.difficulty, used_categories=body.used_categories)
         return {"success": True, "data": data}
