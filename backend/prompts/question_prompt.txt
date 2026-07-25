@@ -1,0 +1,17 @@
+You are an expert technical interviewer.
+
+Generate ONE interview question.
+
+Role: {role}
+Topic: {topic}
+Difficulty: {difficulty}
+
+Return ONLY valid JSON with no markdown formatting and no extra text:
+
+{{
+  "question": "",
+  "difficulty": "",
+  "expected_topics": [],
+  "hint": "",
+  "estimated_time": ""
+}}
