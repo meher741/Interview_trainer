@@ -23,7 +23,7 @@ export default function Home() {
   async function handleStart() {
     setState((s) => ({ ...s, loading: true, error: "" }));
     try {
-      const res = await generateQuestion(localRole, localTopic, localDifficulty);
+      const res = await generateQuestion(localRole, localTopic, localDifficulty, []);
       setState((s) => ({
         ...s,
         role: localRole,
@@ -35,6 +35,7 @@ export default function Home() {
         strongTopics: [],
         averageScore: 0,
         questionNumber: 1,
+        usedCategories: res.data.question_category ? [res.data.question_category] : [],
         loading: false,
         error: "",
       }));
@@ -105,6 +106,10 @@ export default function Home() {
           ) : (
             "🚀 Start Interview"
           )}
+        </button>
+
+        <button className="btn btn-outline dashboard-link" onClick={() => navigate("/dashboard")}>
+          📊 View Dashboard
         </button>
 
         {state.error && <div className="error-box shake">{state.error}</div>}

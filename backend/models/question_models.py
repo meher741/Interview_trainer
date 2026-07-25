@@ -1,11 +1,12 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class QuestionRequest(BaseModel):
     role: str
     topic: str
     difficulty: str
+    used_categories: Optional[List[str]] = None
 
 
 class QuestionResponse(BaseModel):
@@ -14,3 +15,4 @@ class QuestionResponse(BaseModel):
     expected_topics: List[str]
     hint: str
     estimated_time: str
+    question_category: str = "General"

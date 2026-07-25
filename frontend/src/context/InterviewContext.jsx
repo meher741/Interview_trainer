@@ -15,6 +15,7 @@ export function InterviewProvider({ children }) {
     weakTopics: [],
     strongTopics: [],
     averageScore: 0,
+    usedCategories: [],
     loading: false,
     error: "",
   });

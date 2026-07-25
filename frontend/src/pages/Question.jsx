@@ -5,6 +5,37 @@ import { useInterview } from "../context/InterviewContext";
 import { generateQuestion, generateNextQuestion, evaluateAnswer } from "../services/api";
 import useTypewriter from "../hooks/useTypewriter";
 
+const CATEGORY_EMOJIS = {
+  "Problem Statement": "🎯",
+  "Project Workflow": "🔄",
+  "Feature Demonstration": "✨",
+  "Technical Architecture": "🏗️",
+  "Frontend": "🎨",
+  "Backend": "⚙️",
+  "AI / LLM": "🤖",
+  "Prompt Engineering": "📝",
+  "Adaptive Learning": "🧠",
+  "API Design": "🔌",
+  "Database / Storage": "💾",
+  "Security": "🔒",
+  "Performance": "⚡",
+  "Scalability": "📈",
+  "Error Handling": "🛡️",
+  "Testing": "🧪",
+  "Innovation": "💡",
+  "Future Scope": "🔮",
+  "Deployment & DevOps": "🚀",
+  "Team & Development": "👥",
+};
+
+function categoryEmoji(cat) {
+  if (!cat) return "📋";
+  for (const [key, emoji] of Object.entries(CATEGORY_EMOJIS)) {
+    if (cat.toLowerCase().includes(key.toLowerCase())) return emoji;
+  }
+  return "📋";
+}
+
 export default function Question() {
   const { state, setState } = useInterview();
   const navigate = useNavigate();
@@ -26,6 +57,13 @@ export default function Question() {
     if (questionDone && answerRef.current) answerRef.current.focus();
   }, [questionDone]);
 
+  // Auto-load next question when coming from feedback page
+  useEffect(() => {
+    if (!q && state.loading && state.questions.length > 0) {
+      loadNextQuestion();
+    }
+  }, []);
+
   function formatTime(sec) {
     const m = String(Math.floor(sec / 60)).padStart(2, "0");
     const s = String(sec % 60).padStart(2, "0");
@@ -35,7 +73,10 @@ export default function Question() {
   async function loadNextQuestion() {
     setState((s) => ({ ...s, loading: true, error: "" }));
     try {
-      const res = await generateNextQuestion(state.role, state.topic, state.questions);
+      const res = await generateNextQuestion(
+        state.role, state.topic, state.difficulty, state.questions, state.usedCategories
+      );
+      const cat = res.data.question.question_category;
       setState((s) => ({
         ...s,
         question: res.data.question,
@@ -44,6 +85,7 @@ export default function Question() {
         weakTopics: res.data.weak_topics,
         strongTopics: res.data.strong_topics,
         averageScore: res.data.average_score,
+        usedCategories: cat ? [...s.usedCategories, cat] : s.usedCategories,
         answer: "",
         loading: false,
         error: "",
@@ -60,11 +102,12 @@ export default function Question() {
   async function handleFirstQuestion() {
     setState((s) => ({ ...s, loading: true, error: "" }));
     try {
-      const res = await generateQuestion(state.role, state.topic, state.difficulty);
+      const res = await generateQuestion(state.role, state.topic, state.difficulty, []);
       setState((s) => ({
         ...s,
         question: res.data,
         questionNumber: 1,
+        usedCategories: res.data.question_category ? [res.data.question_category] : [],
         answer: "",
         loading: false,
         error: "",
@@ -93,6 +136,7 @@ export default function Question() {
         score: res.data.score,
         expected_topics: q.expected_topics,
         missing_topics: res.data.missing_topics,
+        question_category: q.question_category || "",
       };
       setState((s) => ({
         ...s,
@@ -165,7 +209,14 @@ export default function Question() {
 
       <div className="question-card fade-in-up">
         <div className="question-card-header">
-          <span className="question-label">Question {state.questionNumber}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span className="question-label">Question {state.questionNumber}</span>
+            {q.question_category && (
+              <span className="category-badge">
+                {categoryEmoji(q.question_category)} {q.question_category}
+              </span>
+            )}
+          </div>
           <span className={`badge badge-${state.difficulty.toLowerCase()}`}>
             {state.difficulty === "Easy" ? "🟢" : state.difficulty === "Medium" ? "🟡" : "🔴"} {state.difficulty}
           </span>

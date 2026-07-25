@@ -9,7 +9,7 @@ router = APIRouter()
 @router.post("/generate-question")
 def generate_question_route(body: QuestionRequest):
     try:
-        data = generate_question(body.role, body.topic, body.difficulty)
+        data = generate_question(body.role, body.topic, body.difficulty, used_categories=body.used_categories)
         return {"success": True, "data": data}
     except ValueError as e:
         return JSONResponse(

@@ -1,57 +1,52 @@
 import { useNavigate } from "react-router-dom";
 import { useInterview } from "../context/InterviewContext";
 import { generateDashboard } from "../services/api";
-import ScoreChart from "../components/ScoreChart";
-import TopicChart from "../components/TopicChart";
-import ResourceCard from "../components/ResourceCard";
-import { useEffect, useState } from "react";
-import useAnimatedCounter from "../hooks/useAnimatedCounter";
+import { useEffect, useState, useCallback } from "react";
 import useConfetti from "../hooks/useConfetti";
 
-function scoreBadge(score) {
-  if (score >= 9) return { label: "Interview Ready 🏆", color: "#27ae60" };
-  if (score >= 7) return { label: "Almost Ready 🥈", color: "#2980b9" };
-  if (score >= 5) return { label: "Keep Practicing 📚", color: "#f39c12" };
-  return { label: "Beginner 💪", color: "#e74c3c" };
-}
-
-function StatCard({ value, label, color }) {
-  const { count, ref } = useAnimatedCounter(value, 1200, true);
-  return (
-    <div className="stat-card" ref={ref}>
-      <div className="stat-value" style={color ? { color } : {}}>{count}</div>
-      <div className="stat-label">{label}</div>
-    </div>
-  );
-}
+import DashboardHeader from "../components/dashboard/Header";
+import ScoreCard from "../components/dashboard/ScoreCard";
+import StatsCards from "../components/dashboard/StatsCards";
+import PerformanceChart from "../components/dashboard/PerformanceChart";
+import TopicChart from "../components/dashboard/TopicChart";
+import DifficultyBreakdown from "../components/dashboard/DifficultyBreakdown";
+import ReportSection from "../components/dashboard/ReportSection";
+import ResourceCard from "../components/dashboard/ResourceCard";
 
 export default function Dashboard() {
   const { state } = useInterview();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [apiError, setApiError] = useState("");
   const [celebrate, setCelebrate] = useState(false);
   const canvasRef = useConfetti(celebrate, { count: 120, spread: 120 });
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const res = await generateDashboard(
-          state.role,
-          state.topic,
-          state.questions
-        );
-        setData(res.data);
-        if (res.data.stats.overall_score >= 7) setCelebrate(true);
-      } catch {
-        setError("Unable to load dashboard.");
-      }
+  const hasInterviewData = state.questions && state.questions.length > 0;
+
+  const fetchDashboard = useCallback(async () => {
+    if (!hasInterviewData) {
       setLoading(false);
+      return;
     }
-    if (state.questions.length > 0) load();
-    else setLoading(false);
-  }, []);
+    try {
+      const res = await generateDashboard(state.role, state.topic, state.questions);
+      if (res && res.success && res.data) {
+        setData(res.data);
+        if (res.data.stats && res.data.stats.overall_score >= 7) setCelebrate(true);
+      } else {
+        setApiError("Invalid response from server.");
+      }
+    } catch (err) {
+      console.error("Dashboard fetch error:", err);
+      setApiError("Unable to load dashboard. Please try again.");
+    }
+    setLoading(false);
+  }, [hasInterviewData, state.role, state.topic, state.questions]);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   if (loading) {
     return (
@@ -59,93 +54,106 @@ export default function Dashboard() {
         <div className="loading">
           <div className="spinner" />
           <p>Generating your personalized report...</p>
+          <p style={{ fontSize: 13, color: "var(--text-light)", marginTop: 4 }}>
+            Analyzing your responses
+          </p>
         </div>
       </div>
     );
   }
 
-  if (error || !data) {
+  if (!hasInterviewData || (!data && !loading)) {
     return (
-      <div className="feedback-page fade-in-up">
-        <h1>Dashboard</h1>
-        <p className="error">{error || "No interview data available."}</p>
-        <button className="btn" onClick={() => navigate("/")}>Go Home</button>
+      <div className="dashboard-page fade-in-up">
+        <div className="dash-empty-card fade-in-up">
+          <div className="dash-empty-icon">📊</div>
+          <h2>No Interview Data Yet</h2>
+          <p className="dash-empty-text">
+            Complete an AI-powered interview to see your personalized performance
+            dashboard with scores, insights, and recommendations.
+          </p>
+          <div className="dash-empty-features">
+            <div className="dash-empty-feature">
+              <span className="dash-ef-icon">🎯</span>
+              <span>Real-time scoring</span>
+            </div>
+            <div className="dash-empty-feature">
+              <span className="dash-ef-icon">🧠</span>
+              <span>AI feedback on answers</span>
+            </div>
+            <div className="dash-empty-feature">
+              <span className="dash-ef-icon">📈</span>
+              <span>Performance analytics</span>
+            </div>
+            <div className="dash-empty-feature">
+              <span className="dash-ef-icon">📚</span>
+              <span>Personalized resources</span>
+            </div>
+            {apiError && <div className="error-box shake">{apiError}</div>}
+            <div className="actions" style={{ justifyContent: "center", marginTop: 12 }}>
+              <button className="btn btn-primary btn-start" onClick={() => navigate("/")}>
+                🚀 Start Your First Interview
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const badge = scoreBadge(data.stats.overall_score);
-  const report = data.report;
-  const { count: heroCount, ref: heroRef } = useAnimatedCounter(data.stats.overall_score, 1500, true);
+  const stats = data && data.stats ? data.stats : {};
+  const report = data && data.report ? data.report : {};
+  const resources = data && data.resources ? data.resources : [];
+  const history = data && data.history ? data.history : (state.questions || []);
 
   return (
     <div className="dashboard-page">
       <canvas ref={canvasRef} className="confetti-canvas" />
-      <h1 className="fade-in-up">Interview Complete 🎉</h1>
 
-      <div className="dashboard-hero fade-in-up" style={{ "--badge-color": badge.color }} ref={heroRef}>
-        <div className="hero-score">
-          <span className="hero-number">{heroCount}</span>
-          <span className="hero-total">/10</span>
+      <DashboardHeader
+        role={data && data.role ? data.role : state.role}
+        topic={data && data.topic ? data.topic : state.topic}
+        questionCount={stats.questions_answered || state.questions.length}
+      />
+
+      <ScoreCard overallScore={stats.overall_score || 0} />
+      <StatsCards stats={stats} />
+
+      <div className="dash-charts-row">
+        <PerformanceChart questions={history} />
+        <TopicChart topicPerformance={stats.topic_performance || []} />
+      </div>
+
+      <DifficultyBreakdown stats={stats} />
+
+      {report.summary && (
+        <div className="dash-report-section fade-in-up">
+          <h3 className="dash-report-title">AI Summary</h3>
+          <div className="dash-summary-text">{report.summary}</div>
         </div>
-        <div className="hero-badge" style={{ background: badge.color }}>
-          {badge.label}
+      )}
+
+      <div className="dash-report-grid">
+        <ReportSection title="Strengths" items={report.strengths || []} type="strengths" />
+        <ReportSection title="Areas to Improve" items={report.weaknesses || []} type="weaknesses" />
+      </div>
+
+      <ReportSection title="Recommendations" items={report.recommendations || []} type="recommendations" />
+      <ResourceCard resources={resources} />
+
+      {report.study_plan && (
+        <div className="dash-report-section fade-in-up">
+          <h3 className="dash-report-title">Study Plan</h3>
+          <div className="dash-study-plan">{report.study_plan}</div>
         </div>
-        <div className="hero-label">Overall Performance</div>
-      </div>
+      )}
 
-      <div className="stats-grid fade-in-up">
-        <StatCard value={data.stats.questions_answered} label="Questions" />
-        <StatCard value={data.stats.average_score} label="Avg Score" />
-        <StatCard value={data.stats.highest_score} label="Highest" />
-        <StatCard value={data.stats.lowest_score} label="Lowest" />
-        <StatCard value={data.stats.easy_count} label="Easy" />
-        <StatCard value={data.stats.medium_count} label="Medium" />
-        <StatCard value={data.stats.hard_count} label="Hard" />
-        <StatCard value={data.stats.questions_answered} label="Total" />
-      </div>
-
-      <div className="charts-row fade-in-up">
-        <ScoreChart questions={state.questions} />
-        <TopicChart topicPerformance={data.stats.topic_performance} />
-      </div>
-
-      <div className="feedback-section fade-in-up">
-        <h2>AI Summary</h2>
-        <div className="summary-text">{report.summary}</div>
-      </div>
-
-      <div className="feedback-section fade-in-up">
-        <h2>Strengths</h2>
-        <ul className="strengths">
-          {report.strengths.map((s, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>✔ {s}</li>)}
-        </ul>
-      </div>
-
-      <div className="feedback-section fade-in-up">
-        <h2>Weaknesses</h2>
-        <ul className="weaknesses">
-          {report.weaknesses.map((w, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>✖ {w}</li>)}
-        </ul>
-      </div>
-
-      <div className="feedback-section fade-in-up">
-        <h2>Recommendations</h2>
-        <ul className="recommendations-list">
-          {report.recommendations.map((r, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>• {r}</li>)}
-        </ul>
-      </div>
-
-      <ResourceCard resources={data.resources} />
-
-      <div className="feedback-section fade-in-up">
-        <h2>Study Plan</h2>
-        <div className="study-plan">{report.study_plan}</div>
-      </div>
-
-      <div className="actions fade-in-up">
-        <button className="btn btn-primary" onClick={() => navigate("/")}>
-          🔄 Start New Interview
+      <div className="dash-actions fade-in-up">
+        <button className="btn btn-primary btn-start" onClick={() => navigate("/")}>
+          Start New Interview
+        </button>
+        <button className="btn btn-outline" onClick={() => navigate("/question")}>
+          Practice More
         </button>
       </div>
     </div>

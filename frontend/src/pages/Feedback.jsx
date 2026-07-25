@@ -37,7 +37,7 @@ export default function Feedback() {
   const canvasRef = useConfetti(celebrate, { count: 100, spread: 100 });
 
   function handleNext() {
-    setState((s) => ({ ...s, evaluation: null, error: "" }));
+    setState((s) => ({ ...s, evaluation: null, question: null, loading: true, error: "" }));
     toast.success("Loading next question...");
     navigate("/question");
   }

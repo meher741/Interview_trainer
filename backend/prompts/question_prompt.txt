@@ -1,6 +1,4 @@
-You are an expert technical interviewer.
-
-Generate ONE interview question.
+You are an expert technical interviewer. Generate ONE unique interview question.
 
 Role: {role}
 Topic: {topic}
@@ -9,17 +7,49 @@ Difficulty: {difficulty}
 Weak Topics to focus on: {weak_topics}
 Previous average score: {average_score}
 
+Already used question categories (do NOT reuse these):
+{used_categories}
+
 Avoid repeating these previous questions:
 {question_history}
 
-Focus on the weak topics if any exist. Personalize the difficulty based on the average score.
+Pick ONE category from the list below that is NOT in the used categories list. Randomly choose a category that matches the role and topic. Each question must be from a DIFFERENT category than previous ones.
+
+QUESTION CATEGORIES:
+1. Problem Statement & Importance – "Why is this problem important? Explain the real-world impact and use cases."
+2. Project Workflow – "Walk me through the end-to-end workflow of your application from start to finish."
+3. Feature Demonstration – "Describe the core features of your system. How do they solve user needs?"
+4. Technical Architecture – "Explain the system architecture. How do components interact and communicate?"
+5. Frontend – "How is the UI structured? Explain state management, component design, and user experience."
+6. Backend – "Describe the backend logic. How are APIs structured and business logic implemented?"
+7. AI / LLM – "How was the AI model selected and integrated? Explain the reasoning and implementation."
+8. Prompt Engineering – "How are prompts designed and optimized? Explain structured output handling."
+9. Adaptive Learning – "How does the system personalize content? Explain difficulty adjustment logic."
+10. API Design – "Describe the API endpoints. How is request/response flow designed?"
+11. Database / Storage – "How is data stored and retrieved? Explain schema, sessions, and persistence."
+12. Security – "How are API keys and sensitive data protected? Explain authentication practices."
+13. Performance – "How is speed and efficiency optimized? Explain latency and API efficiency."
+14. Scalability – "How would the system handle more users? Explain production readiness."
+15. Error Handling – "How are failures and edge cases handled? Explain validation and robustness."
+16. Testing – "How is the system tested? Explain functional, API, and edge case testing."
+17. Innovation – "What makes this solution unique? Explain the differentiation from alternatives."
+18. Future Scope – "What enhancements are planned? Explain the roadmap and upcoming features."
+19. Deployment & DevOps – "How is the system deployed? Explain hosting, CI/CD, and monitoring."
+20. Team & Development Process – "How was the team organized? Explain challenges, decisions, and lessons learned."
+
+IMPORTANT RULES:
+- Do NOT reuse categories from the used_categories list
+- Make the question SPECIFIC to the given role, topic, and difficulty
+- Generate a COMPLETELY different question from any previous ones
+- Be creative and ask insightful, challenging questions
 
 Return ONLY valid JSON with no markdown formatting and no extra text:
 
 {{
   "question": "",
-  "difficulty": "",
+  "difficulty": "{difficulty}",
   "expected_topics": [],
   "hint": "",
-  "estimated_time": ""
+  "estimated_time": "",
+  "question_category": ""
 }}

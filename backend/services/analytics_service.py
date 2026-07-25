@@ -24,8 +24,8 @@ def calculate(questions: list[SessionQuestion]) -> dict:
             topic_map[topic].append(q.score)
 
     topic_performance = [
-        {"topic": topic, "average": round(sum(scores) / len(scores), 1)}
-        for topic, scores in sorted(topic_map.items(), key=lambda x: -sum(x[1]) / len(x[1]))
+        {"topic": topic, "average": round(sum(scores_list) / len(scores_list), 1)}
+        for topic, scores_list in sorted(topic_map.items(), key=lambda x: -sum(x[1]) / len(x[1]))
     ]
 
     return {
@@ -39,3 +39,4 @@ def calculate(questions: list[SessionQuestion]) -> dict:
         "hard_count": sum(1 for q in questions if q.difficulty == "Hard"),
         "topic_performance": topic_performance,
     }
+

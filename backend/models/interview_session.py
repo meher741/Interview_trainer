@@ -8,6 +8,7 @@ class SessionQuestion(BaseModel):
     score: int
     expected_topics: List[str]
     missing_topics: List[str]
+    question_category: Optional[str] = ""
 
 
 class InterviewSession(BaseModel):
