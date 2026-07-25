@@ -5,6 +5,8 @@ import ScoreChart from "../components/ScoreChart";
 import TopicChart from "../components/TopicChart";
 import ResourceCard from "../components/ResourceCard";
 import { useEffect, useState } from "react";
+import useAnimatedCounter from "../hooks/useAnimatedCounter";
+import useConfetti from "../hooks/useConfetti";
 
 function scoreBadge(score) {
   if (score >= 9) return { label: "Interview Ready 🏆", color: "#27ae60" };
@@ -13,12 +15,24 @@ function scoreBadge(score) {
   return { label: "Beginner 💪", color: "#e74c3c" };
 }
 
+function StatCard({ value, label, color }) {
+  const { count, ref } = useAnimatedCounter(value, 1200, true);
+  return (
+    <div className="stat-card" ref={ref}>
+      <div className="stat-value" style={color ? { color } : {}}>{count}</div>
+      <div className="stat-label">{label}</div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { state } = useInterview();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [celebrate, setCelebrate] = useState(false);
+  const canvasRef = useConfetti(celebrate, { count: 120, spread: 120 });
 
   useEffect(() => {
     async function load() {
@@ -29,6 +43,7 @@ export default function Dashboard() {
           state.questions
         );
         setData(res.data);
+        if (res.data.stats.overall_score >= 7) setCelebrate(true);
       } catch {
         setError("Unable to load dashboard.");
       }
@@ -40,15 +55,18 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="feedback-page">
-        <div className="loading">Generating your personalized report...</div>
+      <div className="feedback-page fade-in-up">
+        <div className="loading">
+          <div className="spinner" />
+          <p>Generating your personalized report...</p>
+        </div>
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="feedback-page">
+      <div className="feedback-page fade-in-up">
         <h1>Dashboard</h1>
         <p className="error">{error || "No interview data available."}</p>
         <button className="btn" onClick={() => navigate("/")}>Go Home</button>
@@ -58,14 +76,16 @@ export default function Dashboard() {
 
   const badge = scoreBadge(data.stats.overall_score);
   const report = data.report;
+  const { count: heroCount, ref: heroRef } = useAnimatedCounter(data.stats.overall_score, 1500, true);
 
   return (
     <div className="dashboard-page">
-      <h1>Interview Complete 🎉</h1>
+      <canvas ref={canvasRef} className="confetti-canvas" />
+      <h1 className="fade-in-up">Interview Complete 🎉</h1>
 
-      <div className="dashboard-hero" style={{ "--badge-color": badge.color }}>
+      <div className="dashboard-hero fade-in-up" style={{ "--badge-color": badge.color }} ref={heroRef}>
         <div className="hero-score">
-          <span className="hero-number">{data.stats.overall_score}</span>
+          <span className="hero-number">{heroCount}</span>
           <span className="hero-total">/10</span>
         </div>
         <div className="hero-badge" style={{ background: badge.color }}>
@@ -74,84 +94,58 @@ export default function Dashboard() {
         <div className="hero-label">Overall Performance</div>
       </div>
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-value">{data.stats.questions_answered}</div>
-          <div className="stat-label">Questions</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{data.stats.average_score}</div>
-          <div className="stat-label">Avg Score</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{data.stats.highest_score}</div>
-          <div className="stat-label">Highest</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{data.stats.lowest_score}</div>
-          <div className="stat-label">Lowest</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{data.stats.easy_count}</div>
-          <div className="stat-label">Easy</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{data.stats.medium_count}</div>
-          <div className="stat-label">Medium</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value">{data.stats.hard_count}</div>
-          <div className="stat-label">Hard</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: badge.color }}>
-            {report.confidence_level}
-          </div>
-          <div className="stat-label">Confidence</div>
-        </div>
+      <div className="stats-grid fade-in-up">
+        <StatCard value={data.stats.questions_answered} label="Questions" />
+        <StatCard value={data.stats.average_score} label="Avg Score" />
+        <StatCard value={data.stats.highest_score} label="Highest" />
+        <StatCard value={data.stats.lowest_score} label="Lowest" />
+        <StatCard value={data.stats.easy_count} label="Easy" />
+        <StatCard value={data.stats.medium_count} label="Medium" />
+        <StatCard value={data.stats.hard_count} label="Hard" />
+        <StatCard value={data.stats.questions_answered} label="Total" />
       </div>
 
-      <div className="charts-row">
+      <div className="charts-row fade-in-up">
         <ScoreChart questions={state.questions} />
         <TopicChart topicPerformance={data.stats.topic_performance} />
       </div>
 
-      <div className="feedback-section">
+      <div className="feedback-section fade-in-up">
         <h2>AI Summary</h2>
         <div className="summary-text">{report.summary}</div>
       </div>
 
-      <div className="feedback-section">
+      <div className="feedback-section fade-in-up">
         <h2>Strengths</h2>
         <ul className="strengths">
-          {report.strengths.map((s, i) => <li key={i}>✔ {s}</li>)}
+          {report.strengths.map((s, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>✔ {s}</li>)}
         </ul>
       </div>
 
-      <div className="feedback-section">
+      <div className="feedback-section fade-in-up">
         <h2>Weaknesses</h2>
         <ul className="weaknesses">
-          {report.weaknesses.map((w, i) => <li key={i}>✖ {w}</li>)}
+          {report.weaknesses.map((w, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>✖ {w}</li>)}
         </ul>
       </div>
 
-      <div className="feedback-section">
+      <div className="feedback-section fade-in-up">
         <h2>Recommendations</h2>
         <ul className="recommendations-list">
-          {report.recommendations.map((r, i) => <li key={i}>• {r}</li>)}
+          {report.recommendations.map((r, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>• {r}</li>)}
         </ul>
       </div>
 
       <ResourceCard resources={data.resources} />
 
-      <div className="feedback-section">
+      <div className="feedback-section fade-in-up">
         <h2>Study Plan</h2>
         <div className="study-plan">{report.study_plan}</div>
       </div>
 
-      <div className="actions">
-        <button className="btn" onClick={() => navigate("/")}>
-          Start New Interview
+      <div className="actions fade-in-up">
+        <button className="btn btn-primary" onClick={() => navigate("/")}>
+          🔄 Start New Interview
         </button>
       </div>
     </div>

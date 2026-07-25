@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useInterview } from "../context/InterviewContext";
 import { generateQuestion } from "../services/api";
+import useTypewriter from "../hooks/useTypewriter";
+import useFloatingParticles from "../hooks/useFloatingParticles";
 
 const ROLES = ["Software Engineer", "Data Analyst", "DevOps Engineer", "Frontend Developer"];
 const TOPICS = ["DSA", "Java", "Python", "DBMS", "Operating Systems", "Computer Networks", "HR"];
@@ -14,6 +16,9 @@ export default function Home() {
   const [localRole, setLocalRole] = useState(state.role || ROLES[0]);
   const [localTopic, setLocalTopic] = useState(state.topic || TOPICS[0]);
   const [localDifficulty, setLocalDifficulty] = useState(state.difficulty || "Easy");
+  const { displayed } = useTypewriter("InterviewIQ", 100, 200);
+  const { displayed: tagline } = useTypewriter("AI-Powered Personalized Interview Coach", 30, 1200);
+  const canvasRef = useFloatingParticles({ count: 15, speed: 0.2 });
 
   async function handleStart() {
     setState((s) => ({ ...s, loading: true, error: "" }));
@@ -43,14 +48,15 @@ export default function Home() {
 
   return (
     <div className="home">
+      <canvas ref={canvasRef} className="particle-canvas" />
       <div className="hero-section">
         <div className="hero-icon">🎯</div>
-        <h1>InterviewIQ</h1>
-        <p className="hero-subtitle">AI-Powered Personalized Interview Coach</p>
+        <h1>{displayed}<span className={`cursor ${displayed.length === "InterviewIQ".length ? "blink" : ""}`}>|</span></h1>
+        <p className="hero-subtitle">{tagline}<span className={`cursor ${tagline.length === "AI-Powered Personalized Interview Coach".length ? "blink" : ""}`}>|</span></p>
         <p className="hero-desc">Practice • Learn • Improve</p>
       </div>
 
-      <div className="setup-card">
+      <div className="setup-card fade-in-up">
         <div className="form-group">
           <label>📋 Select Role</label>
           <select value={localRole} onChange={(e) => setLocalRole(e.target.value)}>
@@ -68,8 +74,12 @@ export default function Home() {
         <div className="form-group">
           <label>🎯 Difficulty</label>
           <div className="radio-group">
-            {DIFFICULTIES.map((d) => (
-              <label key={d} className={`radio ${localDifficulty === d ? "active" : ""}`}>
+            {DIFFICULTIES.map((d, i) => (
+              <label
+                key={d}
+                className={`radio ${localDifficulty === d ? "active" : ""}`}
+                style={{ animationDelay: `${i * 0.1}s` }}
+              >
                 <input
                   type="radio"
                   name="difficulty"
@@ -83,11 +93,21 @@ export default function Home() {
           </div>
         </div>
 
-        <button className="btn btn-start" onClick={handleStart} disabled={state.loading}>
-          {state.loading ? "⏳ Generating..." : "🚀 Start Interview"}
+        <button
+          className={`btn btn-start ${state.loading ? "pulse" : "glow"}`}
+          onClick={handleStart}
+          disabled={state.loading}
+        >
+          {state.loading ? (
+            <span className="btn-loading">
+              <span className="mini-spinner" /> Generating...
+            </span>
+          ) : (
+            "🚀 Start Interview"
+          )}
         </button>
 
-        {state.error && <div className="error-box">{state.error}</div>}
+        {state.error && <div className="error-box shake">{state.error}</div>}
       </div>
     </div>
   );
