@@ -3,6 +3,7 @@ import Home from "./pages/Home";
 import Question from "./pages/Question";
 import Feedback from "./pages/Feedback";
 import Dashboard from "./pages/Dashboard";
+import Progress from "./pages/Progress";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -16,6 +17,7 @@ export default function App() {
         <div className="nav-links">
           <Link to="/" className="nav-link">Home</Link>
           <Link to="/dashboard" className="nav-link">Dashboard</Link>
+          <Link to="/progress" className="nav-link">📈 Progress</Link>
         </div>
       </nav>
       <Routes>
@@ -28,6 +30,10 @@ export default function App() {
           <Route
             path="/dashboard"
             element={<ErrorBoundary><Dashboard /></ErrorBoundary>}
+          />
+          <Route
+            path="/progress"
+            element={<ErrorBoundary><Progress /></ErrorBoundary>}
           />
         </Route>
         {/* Redirect to home if none of the above match */}

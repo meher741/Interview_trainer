@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -7,6 +8,7 @@ from services.analytics_service import calculate
 from services.report_service import generate_report
 from services.resource_service import recommend_resources
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -36,7 +38,6 @@ def get_dashboard(body: DashboardRequest):
         weak_topics = report.get("weaknesses", [])
         resources = recommend_resources(weak_topics)
 
-        # Build question history with full details for timeline
         history = [
             {
                 "question_number": i + 1,
@@ -73,8 +74,9 @@ def get_dashboard(body: DashboardRequest):
             status_code=400,
             content={"success": False, "message": str(e)},
         )
-    except Exception:
+    except Exception as e:
+        logger.error("Error generating dashboard: %s", str(e), exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={"success": False, "message": "Unable to generate dashboard."},
+            content={"success": False, "message": f"Unable to generate dashboard: {str(e)}"},
         )

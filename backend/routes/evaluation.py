@@ -1,7 +1,9 @@
+import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from services.evaluation_service import evaluate_answer as evaluate
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -21,7 +23,8 @@ def evaluate_answer(body: dict):
             content={"success": False, "message": str(e)},
         )
     except Exception as e:
+        logger.error("Error evaluating answer: %s", str(e), exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={"success": False, "message": "Unable to evaluate answer."},
+            content={"success": False, "message": f"Unable to evaluate answer: {str(e)}"},
         )

@@ -4,6 +4,9 @@ import toast from "react-hot-toast";
 import { useInterview } from "../context/InterviewContext";
 import { generateQuestion, generateNextQuestion, evaluateAnswer } from "../services/api";
 import useTypewriter from "../hooks/useTypewriter";
+import VoicePlayer from "../components/VoicePlayer";
+import VoiceRecorder from "../components/VoiceRecorder";
+import { checkSpeechSupport } from "../utils/speechSupport";
 
 const CATEGORY_EMOJIS = {
   "Problem Statement": "🎯",
@@ -43,10 +46,14 @@ export default function Question() {
   const [answer, setAnswer] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [thinkingSteps, setThinkingSteps] = useState([]);
   const answerRef = useRef(null);
   const { displayed: typedQuestion, done: questionDone } = useTypewriter(
     q ? q.question : "", 18, 400
   );
+
+  const isVoice = state.interviewMode === "voice";
+  const speechSupport = checkSpeechSupport();
 
   useEffect(() => {
     const timer = setInterval(() => setElapsed((s) => s + 1), 1000);
@@ -68,6 +75,10 @@ export default function Question() {
     const m = String(Math.floor(sec / 60)).padStart(2, "0");
     const s = String(sec % 60).padStart(2, "0");
     return `${m}:${s}`;
+  }
+
+  function getApiMessage(err) {
+    return err?.response?.data?.message || err?.message || "Something went wrong. Please try again.";
   }
 
   async function loadNextQuestion() {
@@ -93,9 +104,10 @@ export default function Question() {
       setAnswer("");
       setElapsed(0);
       toast.success("Personalized question ready!");
-    } catch {
-      setState((s) => ({ ...s, loading: false, error: "Unable to generate question." }));
-      toast.error("Failed to generate question");
+    } catch (err) {
+      const msg = getApiMessage(err);
+      setState((s) => ({ ...s, loading: false, error: msg }));
+      toast.error(msg);
     }
   }
 
@@ -115,8 +127,10 @@ export default function Question() {
       setAnswer("");
       setElapsed(0);
       toast.success("Question generated!");
-    } catch {
-      setState((s) => ({ ...s, loading: false, error: "Unable to generate question." }));
+    } catch (err) {
+      const msg = getApiMessage(err);
+      setState((s) => ({ ...s, loading: false, error: msg }));
+      toast.error(msg);
     }
   }
 
@@ -128,8 +142,21 @@ export default function Question() {
     }
     setSubmitting(true);
     setState((s) => ({ ...s, loading: true, error: "" }));
+    setThinkingSteps([]);
+    const thinkingTimers = [];
+    const steps = [
+      "Evaluating your answer...",
+      "Analyzing concepts...",
+      "Checking completeness...",
+      "Generating feedback...",
+    ];
+    steps.forEach((step, i) => {
+      const t = setTimeout(() => setThinkingSteps((prev) => [...prev, step]), (i + 1) * 600);
+      thinkingTimers.push(t);
+    });
     try {
       const res = await evaluateAnswer(q.question, q.expected_topics, answer);
+      thinkingTimers.forEach(clearTimeout);
       const entry = {
         question: q.question,
         difficulty: state.difficulty,
@@ -138,18 +165,33 @@ export default function Question() {
         missing_topics: res.data.missing_topics,
         question_category: q.question_category || "",
       };
+      const voiceStatsUpdate = isVoice
+        ? {
+            questionsAnswered: (state.voiceStats?.questionsAnswered || 0) + 1,
+            speakingTimeTotal: (state.voiceStats?.speakingTimeTotal || 0) + elapsed,
+            averageResponseTime: 0,
+          }
+        : {};
+      if (isVoice && voiceStatsUpdate.questionsAnswered > 0) {
+        voiceStatsUpdate.averageResponseTime = Math.round(
+          voiceStatsUpdate.speakingTimeTotal / voiceStatsUpdate.questionsAnswered
+        );
+      }
       setState((s) => ({
         ...s,
         evaluation: res.data,
         answer,
         questions: [...s.questions, entry],
+        voiceStats: { ...s.voiceStats, ...voiceStatsUpdate },
         loading: false,
       }));
+      setThinkingSteps([]);
       toast.success("Answer evaluated!");
       navigate("/feedback");
-    } catch {
-      setState((s) => ({ ...s, loading: false, error: "Unable to evaluate answer." }));
-      toast.error("Failed to evaluate answer");
+    } catch (err) {
+      const msg = getApiMessage(err);
+      setState((s) => ({ ...s, loading: false, error: msg }));
+      toast.error(msg);
     }
     setSubmitting(false);
   }
@@ -178,9 +220,19 @@ export default function Question() {
       <div className="page-card fade-in-up">
         <div className="loading">
           <div className="spinner" />
-          <p className="typewriter-loading">
-            {["Thinking", "Thinking.", "Thinking..", "Thinking..."][Math.floor((Date.now() / 400) % 4)]}
-          </p>
+          {thinkingSteps.length > 0 ? (
+            <div className="thinking-animation">
+              {thinkingSteps.map((step, i) => (
+                <p key={i} className="thinking-step" style={{ animationDelay: `${i * 0.1}s` }}>
+                  🤖 {step}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="typewriter-loading">
+              {["Thinking", "Thinking.", "Thinking..", "Thinking..."][Math.floor((Date.now() / 400) % 4)]}
+            </p>
+          )}
         </div>
       </div>
     );
@@ -231,24 +283,50 @@ export default function Question() {
         </div>
       </div>
 
+      {isVoice && speechSupport.supported && (
+        <VoicePlayer
+          text={q.question}
+          autoSpeak={true}
+          label="AI Interviewer"
+        />
+      )}
+
       <details className="hint-box fade-in-up">
         <summary>💡 Hint</summary>
         <p>{q.hint}</p>
       </details>
 
-      <textarea
-        ref={answerRef}
-        className={`answer-box fade-in-up ${submitting ? "submitting" : ""}`}
-        rows={5}
-        placeholder="Type your answer here... (Ctrl+Enter to submit)"
-        value={answer}
-        onChange={(e) => setAnswer(e.target.value)}
-        onKeyDown={handleKeyDown}
-        disabled={submitting}
-      />
+      {isVoice && speechSupport.supported ? (
+        <VoiceRecorder
+          onTranscriptChange={(val) => {
+            if (val === "__error__") return;
+            setAnswer(val);
+          }}
+          disabled={submitting}
+        />
+      ) : isVoice && !speechSupport.supported ? (
+        <div className="voice-recorder voice-unsupported fade-in-up">
+          <div className="voice-unsupported-icon">🎤</div>
+          <p>
+            Voice Interview is supported in Google Chrome and Microsoft Edge.
+          </p>
+          <p>Please switch browsers.</p>
+        </div>
+      ) : (
+        <textarea
+          ref={answerRef}
+          className={`answer-box fade-in-up ${submitting ? "submitting" : ""}`}
+          rows={5}
+          placeholder="Type your answer here... (Ctrl+Enter to submit)"
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={submitting}
+        />
+      )}
 
       <div className="actions fade-in-up">
-        <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
+        <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting || (!answer.trim() && isVoice)}>
           {submitting ? "⏳ Evaluating..." : "✅ Submit Answer"}
         </button>
         <button className="btn btn-destructive" onClick={() => navigate("/")}>

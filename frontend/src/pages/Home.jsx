@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useInterview } from "../context/InterviewContext";
-import { generateQuestion } from "../services/api";
+import { generateQuestion, startInterview } from "../services/api";
 import useTypewriter from "../hooks/useTypewriter";
 import useFloatingParticles from "../hooks/useFloatingParticles";
 
@@ -179,6 +179,7 @@ export default function Home() {
   const [localRole, setLocalRole] = useState(state.role || "");
   const [localTopic, setLocalTopic] = useState(state.topic || "");
   const [localDifficulty, setLocalDifficulty] = useState(state.difficulty || "Easy");
+  const [localMode, setLocalMode] = useState(state.interviewMode || "text");
   const { displayed } = useTypewriter("InterviewIQ", 100, 200);
   const { displayed: tagline } = useTypewriter("AI-Powered Personalized Interview Coach", 30, 1200);
   const canvasRef = useFloatingParticles({ count: 18, speed: 0.25 });
@@ -190,27 +191,42 @@ export default function Home() {
     }
     setState((s) => ({ ...s, loading: true, error: "" }));
     try {
+      // Start interview session in DB (persistent)
+      let sessionId = null;
+      try {
+        const sessionRes = await startInterview(localRole, localTopic);
+        if (sessionRes?.success && sessionRes?.data?.session_id) {
+          sessionId = sessionRes.data.session_id;
+        }
+      } catch (sessionErr) {
+        console.warn("Failed to create interview session (proceeding anyway):", sessionErr);
+      }
+
+      // Generate first question
       const res = await generateQuestion(localRole, localTopic, localDifficulty, []);
       setState((s) => ({
         ...s,
         role: localRole,
         topic: localTopic,
         difficulty: localDifficulty,
+        interviewMode: localMode,
         question: res.data,
         questions: [],
         weakTopics: [],
         strongTopics: [],
         averageScore: 0,
         questionNumber: 1,
+        sessionId: sessionId,
         usedCategories: res.data.question_category ? [res.data.question_category] : [],
         loading: false,
         error: "",
       }));
       toast.success("Question generated!");
       navigate("/question");
-    } catch {
-      setState((s) => ({ ...s, loading: false, error: "Unable to generate question." }));
-      toast.error("Failed to generate question");
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || "Unable to generate question.";
+      setState((s) => ({ ...s, loading: false, error: msg }));
+      toast.error(msg);
     }
   }
 
@@ -264,6 +280,44 @@ export default function Home() {
                 </div>
               </label>
             ))}
+          </div>
+        </div>
+
+        <div className="form-group">
+          <label>🎙️ Interview Mode</label>
+          <div className="radio-group">
+            <label
+              className={`radio ${localMode === "text" ? "active" : ""}`}
+            >
+              <input
+                type="radio"
+                name="mode"
+                value="text"
+                checked={localMode === "text"}
+                onChange={(e) => setLocalMode(e.target.value)}
+              />
+              <span className="emoji">⌨️</span>
+              <div>
+                <span>Text Interview</span>
+                <small style={{ display: "block", fontWeight: 400, fontSize: "11px", opacity: 0.7 }}>Type your answers</small>
+              </div>
+            </label>
+            <label
+              className={`radio ${localMode === "voice" ? "active" : ""}`}
+            >
+              <input
+                type="radio"
+                name="mode"
+                value="voice"
+                checked={localMode === "voice"}
+                onChange={(e) => setLocalMode(e.target.value)}
+              />
+              <span className="emoji">🎤</span>
+              <div>
+                <span>Voice Interview</span>
+                <small style={{ display: "block", fontWeight: 400, fontSize: "11px", opacity: 0.7 }}>Speak your answers</small>
+              </div>
+            </label>
           </div>
         </div>
 

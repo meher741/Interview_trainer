@@ -1,8 +1,10 @@
+import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from models.question_models import QuestionRequest
 from services.question_service import generate_question
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -16,8 +18,9 @@ def generate_question_route(body: QuestionRequest):
             status_code=400,
             content={"success": False, "message": str(e)},
         )
-    except Exception:
+    except Exception as e:
+        logger.error("Error generating question: %s", str(e), exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={"success": False, "message": "Unable to generate question."},
+            content={"success": False, "message": f"Unable to generate question: {str(e)}"},
         )

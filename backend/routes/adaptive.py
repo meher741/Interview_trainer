@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -6,6 +7,7 @@ from models.interview_session import InterviewSession, SessionQuestion
 from services.skill_analyzer import analyze
 from services.question_service import generate_personalized_question
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -41,7 +43,6 @@ def generate_next_question(body: NextQuestionRequest):
         session.weak_topics = skills["weak_topics"]
         session.strong_topics = skills["strong_topics"]
 
-        # Use the original difficulty selected by the user (not adaptive)
         user_difficulty = body.difficulty
         session.current_difficulty = user_difficulty
 
@@ -78,7 +79,8 @@ def generate_next_question(body: NextQuestionRequest):
             content={"success": False, "message": str(e)},
         )
     except Exception as e:
+        logger.error("Error generating next question: %s", str(e), exc_info=True)
         return JSONResponse(
             status_code=500,
-            content={"success": False, "message": "Unable to generate next question."},
+            content={"success": False, "message": f"Unable to generate next question: {str(e)}"},
         )

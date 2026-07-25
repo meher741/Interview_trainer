@@ -1,5 +1,9 @@
+import logging
 from dotenv import load_dotenv
 import os
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 # Load environment variables from the .env file in the backend directory
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -16,6 +20,7 @@ from routes.evaluation import router as evaluation_router
 from routes.adaptive import router as adaptive_router
 from routes.dashboard import router as dashboard_router
 from routes.auth import router as auth_router
+from routes.analytics import router as analytics_router
 
 
 @asynccontextmanager
@@ -41,6 +46,7 @@ app.include_router(question_router)
 app.include_router(evaluation_router)
 app.include_router(adaptive_router)
 app.include_router(dashboard_router)
+app.include_router(analytics_router)
 
 # Handle CORS preflight at the app level for any unhandled OPTIONS requests
 @app.options("/{full_path:path}")

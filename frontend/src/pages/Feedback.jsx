@@ -1,8 +1,11 @@
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useInterview } from "../context/InterviewContext";
+import { saveAttempt, finishInterview, startInterview } from "../services/api";
 import useAnimatedScore from "../hooks/useAnimatedScore";
 import useConfetti from "../hooks/useConfetti";
+import useSpeechSynthesis from "../hooks/useSpeechSynthesis";
 
 function scoreLabel(score) {
   if (score >= 9) return "Excellent";
@@ -29,31 +32,102 @@ function coachingMessage(state) {
 }
 
 export default function Feedback() {
-  const { state, setState } = useInterview();
+  const { state, setState, resetInterview } = useInterview();
   const navigate = useNavigate();
   const e = state.evaluation;
   const animatedScore = useAnimatedScore(e ? e.score : 0, 1200);
   const celebrate = e && e.score >= 7;
   const canvasRef = useConfetti(celebrate, { count: 100, spread: 100 });
+  const { speak: speakFeedback, supported: ttsSupported } = useSpeechSynthesis();
+  const isVoice = state.interviewMode === "voice";
+  const attemptSaved = useRef(false);
 
-  function handleNext() {
-    setState((s) => ({ ...s, evaluation: null, question: null, loading: true, error: "" }));
-    toast.success("Loading next question...");
+  // Save attempt to DB when evaluation is received
+  useEffect(() => {
+    if (e && !attemptSaved.current && state.questions.length > 0) {
+      attemptSaved.current = true;
+      const lastQuestion = state.questions[state.questions.length - 1];
+
+      // Save to backend silently
+      saveAttempt({
+        session_id: state.sessionId,
+        role: state.role,
+        topic: state.topic,
+        difficulty: lastQuestion.difficulty,
+        question_text: lastQuestion.question,
+        answer_text: state.answer,
+        score: e.score,
+        strengths: e.strengths,
+        weaknesses: e.weaknesses,
+        missing_topics: e.missing_topics,
+        expected_topics: lastQuestion.expected_topics,
+        question_category: lastQuestion.question_category,
+        confidence: e.confidence,
+        next_difficulty: e.next_difficulty,
+      }).catch((err) => {
+        console.warn("Failed to save attempt to DB:", err);
+      });
+    }
+  }, [e, state.questions, state.answer, state.sessionId, state.role, state.topic]);
+
+  useEffect(() => {
+    if (isVoice && ttsSupported && e) {
+      const feedbackText = `You scored ${e.score} out of 10. ${e.feedback}`;
+      const timer = setTimeout(() => speakFeedback(feedbackText), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [isVoice, ttsSupported, e]);
+
+  async function handleNext() {
+    // Create a new DB session if we don't have one yet
+    let currentSessionId = state.sessionId;
+    if (!currentSessionId) {
+      try {
+        const sessionRes = await startInterview(state.role, state.topic);
+        if (sessionRes?.success && sessionRes?.data?.session_id) {
+          currentSessionId = sessionRes.data.session_id;
+        }
+      } catch (err) {
+        console.warn("Failed to create session for next question:", err);
+      }
+    }
+
+    setState((s) => ({
+      ...s,
+      sessionId: currentSessionId,
+      evaluation: null,
+      question: null,
+      loading: true,
+      error: "",
+    }));
     navigate("/question");
   }
 
-  function handleFinish() {
+  async function handleFinish() {
+    // Finish the session in DB
+    if (state.sessionId) {
+      try {
+        await finishInterview(state.sessionId);
+      } catch (err) {
+        console.warn("Failed to finish session:", err);
+      }
+    }
     navigate("/dashboard");
   }
 
-  function handleEndEarly() {
+  async function handleEndEarly() {
     if (state.questions.length > 0) {
+      // Finish the session in DB
+      if (state.sessionId) {
+        try {
+          await finishInterview(state.sessionId);
+        } catch (err) {
+          console.warn("Failed to finish session:", err);
+        }
+      }
       navigate("/dashboard");
     } else {
-      setState((s) => ({
-        ...s, question: null, evaluation: null, questions: [],
-        weakTopics: [], strongTopics: [], averageScore: 0, questionNumber: 1,
-      }));
+      resetInterview();
       navigate("/");
     }
   }
@@ -75,90 +149,122 @@ export default function Feedback() {
   const circumf = 2 * Math.PI * 60;
 
   return (
-    <div className="feedback-page">
+    <div className="feedback-page page-full">
       <canvas ref={canvasRef} className="confetti-canvas" />
-      <h1 className="fade-in-up">Your Results</h1>
+      <div className="feedback-layout">
+        <aside className="feedback-sidebar">
+          <div className="score-section" style={{ "--score-color": color }}>
+            <div className="score-circle">
+              <svg width="120" height="120" viewBox="0 0 140 140">
+                <circle cx="70" cy="70" r="60" fill="none" stroke="#eee" strokeWidth="10" />
+                <circle
+                  cx="70" cy="70" r="60" fill="none" stroke={color} strokeWidth="10"
+                  strokeDasharray={`${circumf} ${circumf}`}
+                  strokeDashoffset={(1 - animatedScore / 10) * circumf}
+                  strokeLinecap="round"
+                  transform="rotate(-90 70 70)"
+                  className="score-arc"
+                />
+              </svg>
+              <div className="score-text">
+                <span className="score-number score-animated">{animatedScore}</span>
+                <span className="score-total">/10</span>
+              </div>
+            </div>
+            <div className="score-label" style={{ color }}>{scoreLabel(e.score)}</div>
+            <div className="score-bar-wrap">
+              <div className="score-bar-bg">
+                <div className="score-bar-fill" style={{ width: `${(e.score / 10) * 100}%`, background: color }} />
+              </div>
+            </div>
 
-      <div className="score-section fade-in-up" style={{ "--score-color": color }}>
-        <div className="score-circle">
-          <svg width="140" height="140" viewBox="0 0 140 140">
-            <circle cx="70" cy="70" r="60" fill="none" stroke="#eee" strokeWidth="10" />
-            <circle
-              cx="70" cy="70" r="60" fill="none" stroke={color} strokeWidth="10"
-              strokeDasharray={`${circumf} ${circumf}`}
-              strokeDashoffset={(1 - animatedScore / 10) * circumf}
-              strokeLinecap="round"
-              transform="rotate(-90 70 70)"
-              className="score-arc"
-            />
-          </svg>
-          <div className="score-text">
-            <span className="score-number score-animated">{animatedScore}</span>
-            <span className="score-total">/10</span>
+            <div className="score-meta-stack">
+              <div className="score-meta-item">
+                <span className="score-meta-icon">🗣️</span>
+                <div>
+                  <div className="score-meta-label">Confidence</div>
+                  <span className={`confidence ${e.confidence.toLowerCase()}`}>{e.confidence}</span>
+                </div>
+              </div>
+              <div className="score-meta-item">
+                <span className="score-meta-icon">➡️</span>
+                <div>
+                  <div className="score-meta-label">Next</div>
+                  <span className={`badge badge-${e.next_difficulty.toLowerCase()}`}>{e.next_difficulty}</span>
+                </div>
+              </div>
+            </div>
+
+            {state.questions.length > 0 && (
+              <div className="score-mini-stats">
+                <div className="mini-stat">
+                  <span className="mini-stat-value">{state.averageScore}</span>
+                  <span className="mini-stat-label">Avg</span>
+                </div>
+                <div className="mini-stat">
+                  <span className="mini-stat-value">{state.questions.length}</span>
+                  <span className="mini-stat-label">Q's</span>
+                </div>
+                {state.weakTopics.length > 0 && (
+                  <div className="mini-stat mini-stat-wide">
+                    <span className="mini-stat-label">Focus</span>
+                    <span className="mini-stat-value-sm">{state.weakTopics.slice(0, 2).join(", ")}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-        </div>
-        <div className="score-label" style={{ color }}>{scoreLabel(e.score)}</div>
-      </div>
 
-      <div className="coaching-message fade-in-up">{coachingMessage(state)}</div>
+          <div className="coaching-message">{coachingMessage(state)}</div>
 
-      <div className="feedback-section fade-in-up">
-        <h2>🟢 Strengths</h2>
-        <ul className="strengths">
-          {e.strengths.map((s, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>✔ {s}</li>)}
-        </ul>
-      </div>
+          <div className="feedback-sidebar-actions">
+            {state.questionNumber < 5 ? (
+              <button className="btn btn-primary btn-block" onClick={handleNext}>Next Question →</button>
+            ) : (
+              <button className="btn btn-primary btn-block" onClick={handleFinish}>📊 See Full Report</button>
+            )}
+            <button className="btn btn-destructive btn-block" onClick={handleEndEarly}>
+              {state.questionNumber < 5 ? "End & See Report" : "End Interview"}
+            </button>
+          </div>
+        </aside>
 
-      <div className="feedback-section fade-in-up">
-        <h2>🔴 Weaknesses</h2>
-        <ul className="weaknesses">
-          {e.weaknesses.map((w, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>✖ {w}</li>)}
-        </ul>
-      </div>
+        <main className="feedback-main">
+          <div className="feedback-grid-2col">
+            <div className="feedback-section">
+              <h2>🟢 Strengths</h2>
+              <ul className="strengths">
+                {e.strengths.map((s, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>✔ {s}</li>)}
+              </ul>
+            </div>
+            <div className="feedback-section">
+              <h2>🔴 Weaknesses</h2>
+              <ul className="weaknesses">
+                {e.weaknesses.map((w, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>✖ {w}</li>)}
+              </ul>
+            </div>
+          </div>
 
-      {e.missing_topics.length > 0 && (
-        <div className="feedback-section fade-in-up">
-          <h2>📌 Missing Concepts</h2>
-          <ul className="missing">
-            {e.missing_topics.map((m, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>• {m}</li>)}
-          </ul>
-        </div>
-      )}
-
-      <div className="feedback-section fade-in-up">
-        <h2>💡 Ideal Answer</h2>
-        <div className="ideal-answer">{e.ideal_answer}</div>
-      </div>
-
-      <div className="feedback-section fade-in-up">
-        <h2>🗣️ Interviewer Feedback</h2>
-        <div className="feedback-text">{e.feedback}</div>
-      </div>
-
-      <div className="meta-row fade-in-up">
-        <div><strong>Confidence:</strong> <span className={`confidence ${e.confidence.toLowerCase()}`}>{e.confidence}</span></div>
-        <div><strong>Next:</strong> <span className={`badge badge-${e.next_difficulty.toLowerCase()}`}>{e.next_difficulty}</span></div>
-      </div>
-
-      {state.questions.length > 0 && (
-        <div className="stats-row fade-in-up">
-          <span>📊 Avg Score: <strong>{state.averageScore}</strong></span>
-          <span>❓ Questions: <strong>{state.questions.length}</strong></span>
-          {state.weakTopics.length > 0 && (
-            <span>📉 Weak Areas: <strong>{state.weakTopics.slice(0, 3).join(", ")}</strong></span>
+          {e.missing_topics.length > 0 && (
+            <div className="feedback-section">
+              <h2>📌 Missing Concepts</h2>
+              <ul className="missing missing-horizontal">
+                {e.missing_topics.map((m, i) => <li key={i} style={{ animationDelay: `${i * 0.08}s` }}>• {m}</li>)}
+              </ul>
+            </div>
           )}
-        </div>
-      )}
 
-      <div className="actions fade-in-up">
-        {state.questionNumber < 5 ? (
-          <button className="btn btn-primary" onClick={handleNext}>Next Question →</button>
-        ) : (
-          <button className="btn btn-primary" onClick={handleFinish}>📊 See Full Report</button>
-        )}
-        <button className="btn btn-destructive" onClick={handleEndEarly}>
-          {state.questionNumber < 5 ? "End & See Report" : "End Interview"}
-        </button>
+          <div className="feedback-grid-2col">
+            <div className="feedback-section">
+              <h2>💡 Ideal Answer</h2>
+              <div className="ideal-answer">{e.ideal_answer}</div>
+            </div>
+            <div className="feedback-section">
+              <h2>🗣️ Interviewer Feedback</h2>
+              <div className="feedback-text">{e.feedback}</div>
+            </div>
+          </div>
+        </main>
       </div>
 
       {state.error && <div className="error-box shake">{state.error}</div>}

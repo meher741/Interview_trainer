@@ -11,6 +11,8 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
+    interview_sessions = relationship("InterviewSession", back_populates="user", cascade="all, delete-orphan")
+    attempts = relationship("QuestionAttempt", back_populates="user", cascade="all, delete-orphan")
     
     def set_password(self, password: str):
         self.password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()

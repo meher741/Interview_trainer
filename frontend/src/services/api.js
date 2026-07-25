@@ -61,3 +61,33 @@ export async function generateDashboard(role, topic, questions) {
   const { data } = await api.post("/dashboard", { role, topic, questions });
   return data;
 }
+
+export async function startInterview(role, topic) {
+  const { data } = await api.post("/interview/start", { role, topic });
+  return data;
+}
+
+export async function saveAttempt(attemptData) {
+  const { data } = await api.post("/interview/save", attemptData);
+  return data;
+}
+
+export async function finishInterview(sessionId) {
+  const { data } = await api.post("/interview/finish", { session_id: sessionId });
+  return data;
+}
+
+export async function getDashboardAnalytics() {
+  const { data } = await api.get("/analytics/dashboard");
+  return data;
+}
+
+export async function getInterviewHistory() {
+  const { data } = await api.get("/analytics/history");
+  return data;
+}
+
+export async function getRecommendations() {
+  const { data } = await api.get("/analytics/recommendations");
+  return data;
+}

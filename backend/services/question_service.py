@@ -1,6 +1,9 @@
 import os
 import json
+import logging
 from services.groq_service import ask_groq
+
+logger = logging.getLogger(__name__)
 
 PROMPT_PATH = os.path.join(os.path.dirname(__file__), "..", "prompts", "question_prompt.txt")
 
@@ -28,7 +31,11 @@ def _clean_json(raw):
 
 
 def _parse_question(raw):
-    data = json.loads(_clean_json(raw))
+    try:
+        data = json.loads(_clean_json(raw))
+    except json.JSONDecodeError as e:
+        logger.error("Failed to parse question JSON. Raw response: %s", raw[:500])
+        raise ValueError(f"Invalid JSON from AI: {e}")
     data.setdefault("question_category", "General")
     data.setdefault("question", "")
     data.setdefault("difficulty", "")
