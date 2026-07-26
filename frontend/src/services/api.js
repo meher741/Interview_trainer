@@ -91,3 +91,8 @@ export async function getRecommendations() {
   const { data } = await api.get("/analytics/recommendations");
   return data;
 }
+
+export async function getProgressData() {
+  const { data } = await api.get("/analytics/progress");
+  return data;
+}

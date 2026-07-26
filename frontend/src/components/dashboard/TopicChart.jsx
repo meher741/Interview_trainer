@@ -10,8 +10,8 @@ export default function TopicChart({ topicPerformance = [] }) {
     }));
 
     return (
-        <div className="dash-chart-card fade-in-up">
-            <h3 className="dash-chart-title">🎯 Topic Performance</h3>
+        <div className="dash-chart-card fade-in-up chart-container">
+            <h3 className="dash-chart-title">dY"s Topic Performance</h3>
             <p className="dash-chart-subtitle">How you performed in each topic area</p>
             <ResponsiveContainer width="100%" height={Math.max(data.length * 50, 150)}>
                 <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>

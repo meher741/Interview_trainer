@@ -25,8 +25,8 @@ export default function PerformanceChart({ questions = [], trend = [] }) {
     if (!hasQuestionData && !hasTrendData) return null;
 
     return (
-        <div className="dash-chart-card fade-in-up">
-            <h3 className="dash-chart-title">📈 Performance Trend</h3>
+        <div className="dash-chart-card fade-in-up chart-container">
+            <h3 className="dash-chart-title">dY"^ Performance Trend</h3>
 
             {hasTrendData && (
                 <>

@@ -22,6 +22,7 @@ from services.analytics_service import (
 )
 from services.progress_service import get_progress_report
 from services.recommendation_service import generate_recommendations
+from services.progress_v2_service import get_comprehensive_progress
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -201,6 +202,16 @@ async def get_interview_history(user: User = Depends(get_current_user), db: Asyn
         return {"success": True, "data": {"sessions": history}}
     except Exception as e:
         logger.error("Error fetching history: %s", str(e), exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "message": str(e)})
+
+
+@router.get("/analytics/progress")
+async def get_progress(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    try:
+        progress_data = await get_comprehensive_progress(db, user.email, user)
+        return {"success": True, "data": progress_data}
+    except Exception as e:
+        logger.error("Error fetching progress: %s", str(e), exc_info=True)
         return JSONResponse(status_code=500, content={"success": False, "message": str(e)})
 
 

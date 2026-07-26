@@ -1,10 +1,21 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getDashboardAnalytics, getInterviewHistory, getRecommendations } from "../services/api";
-import PerformanceChart from "../components/dashboard/PerformanceChart";
-import TopicChart from "../components/dashboard/TopicChart";
+import { getProgressData } from "../services/api";
 
 function formatDate(dateStr) {
+    if (!dateStr) return "";
+    try {
+        return new Date(dateStr).toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+        });
+    } catch {
+        return dateStr;
+    }
+}
+
+function formatDateTime(dateStr) {
     if (!dateStr) return "";
     try {
         return new Date(dateStr).toLocaleDateString(undefined, {
@@ -19,34 +30,124 @@ function formatDate(dateStr) {
     }
 }
 
+// Mini SVG Bar Chart for topic performance
+function TopicBar({ label, score, maxScore = 10, color }) {
+    const pct = (score / maxScore) * 100;
+    return (
+        <div className="topic-bar-row">
+            <span className="topic-bar-label">{label}</span>
+            <div className="topic-bar-track">
+                <div
+                    className="topic-bar-fill"
+                    style={{ width: `${pct}%`, background: color || "var(--primary)" }}
+                />
+            </div>
+            <span className="topic-bar-score">{score}/10</span>
+        </div>
+    );
+}
+
+// Mini SVG Line Chart for interview history
+function MiniLineChart({ data }) {
+    if (!data || data.length < 2) return null;
+    const height = 120;
+    const maxScore = 10;
+
+    return (
+        <div className="mini-chart-container">
+            <svg viewBox={`0 0 ${100} ${height}`} preserveAspectRatio="none" className="mini-chart-svg">
+                {/* Grid lines */}
+                {[2, 4, 6, 8, 10].map((v) => (
+                    <line
+                        key={v}
+                        x1="0"
+                        y1={((maxScore - v) / maxScore) * height}
+                        x2="100"
+                        y2={((maxScore - v) / maxScore) * height}
+                        stroke="var(--card-border)"
+                        strokeWidth="0.5"
+                        strokeDasharray="3,3"
+                    />
+                ))}
+                {/* Area fill */}
+                <polygon
+                    points={`
+                        0,${height}
+                        ${data
+                            .map(
+                                (d, i) =>
+                                    `${(i / (data.length - 1)) * 100},${((maxScore - d.score) / maxScore) * height}`
+                            )
+                            .join(" ")}
+                        100,${height}
+                    `}
+                    fill="url(#chartGradient)"
+                    opacity="0.15"
+                />
+                <defs>
+                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="var(--primary)" />
+                        <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+                    </linearGradient>
+                </defs>
+                {/* Line */}
+                <polyline
+                    points={data
+                        .map((d, i) => `${(i / (data.length - 1)) * 100},${((maxScore - d.score) / maxScore) * height}`)
+                        .join(" ")}
+                    fill="none"
+                    stroke="var(--primary)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                />
+                {/* Dots */}
+                {data.map((d, i) => (
+                    <circle
+                        key={i}
+                        cx={(i / (data.length - 1)) * 100}
+                        cy={((maxScore - d.score) / maxScore) * height}
+                        r="3.5"
+                        fill="var(--primary)"
+                        stroke="var(--card)"
+                        strokeWidth="2"
+                    />
+                ))}
+            </svg>
+            {/* X-axis labels */}
+            <div className="mini-chart-labels">
+                {data.map((d, i) => (
+                    <span key={i} className="mini-chart-label">
+                        {formatDate(d.date).split(" ")[0]}
+                    </span>
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export default function Progress() {
     const navigate = useNavigate();
-    const [analytics, setAnalytics] = useState(null);
-    const [history, setHistory] = useState(null);
-    const [recommendations, setRecommendations] = useState(null);
+    const [progressData, setProgressData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [activeTab, setActiveTab] = useState("overview");
 
     useEffect(() => {
-        async function fetchAll() {
+        async function fetchProgress() {
             try {
-                const [analyticsRes, historyRes, recsRes] = await Promise.all([
-                    getDashboardAnalytics(),
-                    getInterviewHistory(),
-                    getRecommendations(),
-                ]);
-
-                if (analyticsRes?.success) setAnalytics(analyticsRes.data);
-                if (historyRes?.success) setHistory(historyRes.data);
-                if (recsRes?.success) setRecommendations(recsRes.data);
+                const res = await getProgressData();
+                if (res?.success && res?.data) {
+                    setProgressData(res.data);
+                } else {
+                    setError("Unable to load progress data.");
+                }
             } catch (err) {
-                console.error("Failed to fetch progress data:", err);
+                console.error("Failed to fetch progress:", err);
                 setError("Unable to load your progress. Please complete an interview first.");
             }
             setLoading(false);
         }
-        fetchAll();
+        fetchProgress();
     }, []);
 
     if (loading) {
@@ -60,7 +161,7 @@ export default function Progress() {
         );
     }
 
-    if (error && !analytics) {
+    if (error && !progressData) {
         return (
             <div className="page-full fade-in-up">
                 <div className="dash-empty-card fade-in-up">
@@ -80,314 +181,361 @@ export default function Progress() {
         );
     }
 
-    const stats = analytics?.stats || {};
-    const topicPerf = analytics?.topic_performance || [];
-    const weakTopics = analytics?.weak_topics || [];
-    const strongTopics = analytics?.strong_topics || [];
-    const trend = analytics?.improvement_trend || [];
-    const streak = analytics?.learning_streak || {};
-    const progress = analytics?.progress || {};
-    const sessions = history?.sessions || [];
+    const pd = progressData || {};
+    const userInfo = pd.user_info || {};
+    const overallProgress = pd.overall_progress || {};
+    const readiness = pd.readiness || {};
+    const stats = pd.performance_stats || {};
+    const history = pd.interview_history || [];
+    const topics = pd.topic_performance || [];
+    const skillImp = pd.skill_improvement || [];
+    const strengths = pd.strengths || [];
+    const weaknesses = pd.weaknesses || [];
+    const aiInsights = pd.ai_insights || "";
+    const studyPlan = pd.study_plan || [];
+    const resources = pd.resources || [];
+    const nextGoal = pd.next_goal || {};
+    const badges = pd.badges || [];
+
+    const getTopicColor = (status) => {
+        switch (status) {
+            case "Strong": return "var(--success)";
+            case "Good": return "var(--warning)";
+            case "Practice": return "#f97316";
+            case "Weak": return "var(--danger)";
+            default: return "var(--primary)";
+        }
+    };
 
     return (
-        <div className="page-full progress-page fade-in-up">
-            <div className="progress-header">
-                <h1>📈 My Progress</h1>
-                <p className="progress-subtitle">
-                    Track your improvement across all interview sessions
-                </p>
-            </div>
-
-            {/* Streak Banner */}
-            {streak?.current_streak > 0 && (
-                <div className="dash-streak-banner fade-in-up" style={{ marginBottom: 16 }}>
-                    🔥 <strong>{streak.current_streak} day streak</strong> · {streak.total_practice_days} total practice days · Best: {streak.longest_streak} days
+        <div className="page-full progress-page-enhanced fade-in-up">
+            {/* ============================================ */}
+            {/* SECTION 1: User Overview / Welcome Card       */}
+            {/* ============================================ */}
+            <div className="pro-user-card">
+                <div className="pro-user-avatar">
+                    {userInfo.email?.charAt(0).toUpperCase() || "?"}
                 </div>
-            )}
-
-            {/* Summary Stats */}
-            <div className="progress-stats-grid">
-                <div className="progress-stat-card">
-                    <div className="progress-stat-value">{stats.total_questions || 0}</div>
-                    <div className="progress-stat-label">Total Questions</div>
-                </div>
-                <div className="progress-stat-card">
-                    <div className="progress-stat-value">{stats.average_score || 0}/10</div>
-                    <div className="progress-stat-label">Average Score</div>
-                </div>
-                <div className="progress-stat-card">
-                    <div className="progress-stat-value">{stats.sessions_count || 0}</div>
-                    <div className="progress-stat-label">Sessions</div>
-                </div>
-                <div className="progress-stat-card">
-                    <div className="progress-stat-value" style={{ color: progress.consistency_score >= 70 ? "#27ae60" : "#f39c12" }}>
-                        {progress.consistency_score || 0}%
+                <div className="pro-user-info">
+                    <h1 className="pro-user-greeting">
+                        👋 Welcome, <span className="pro-user-name">{userInfo.email?.split("@")[0] || "User"}</span>
+                    </h1>
+                    <div className="pro-user-meta">
+                        <span>🎯 Target Role: <strong>{userInfo.target_role || "Software Engineer"}</strong></span>
+                        <span>🎤 Mode: <strong>{userInfo.interview_mode || "Voice & Text"}</strong></span>
+                        <span>📅 Member Since: <strong>{formatDate(userInfo.member_since) || "N/A"}</strong></span>
                     </div>
-                    <div className="progress-stat-label">Consistency</div>
                 </div>
-                <div className="progress-stat-card">
-                    <div className="progress-stat-value" style={{ color: progress.improvement_rate >= 0 ? "#27ae60" : "#e74c3c" }}>
-                        {progress.improvement_rate > 0 ? "+" : ""}{progress.improvement_rate || 0}
+            </div>
+
+            {/* ============================================ */}
+            {/* SECTION 2: Overall Progress                    */}
+            {/* ============================================ */}
+            <div className="pro-section pro-overall-section">
+                <div className="pro-overall-left">
+                    <h2 className="pro-section-title">Overall Progress</h2>
+                    <div className="pro-overall-pct">{overallProgress.percentage || 0}%</div>
+                    <div className="pro-overall-bar-bg">
+                        <div
+                            className="pro-overall-bar-fill"
+                            style={{ width: `${overallProgress.percentage || 0}%` }}
+                        />
                     </div>
-                    <div className="progress-stat-label">Improvement</div>
+                    <div className="pro-overall-stats-row">
+                        <span>Avg Score: <strong>{overallProgress.score || 0}/10</strong></span>
+                        <span>Consistency: <strong>{overallProgress.consistency || 0}%</strong></span>
+                        <span>Completion: <strong>{overallProgress.completion_rate || 0}%</strong></span>
+                    </div>
                 </div>
-                <div className="progress-stat-card">
-                    <div className="progress-stat-value">{streak.total_practice_days || 0}</div>
-                    <div className="progress-stat-label">Practice Days</div>
-                </div>
-            </div>
-
-            {/* Tabs */}
-            <div className="progress-tabs">
-                <button
-                    className={`progress-tab ${activeTab === "overview" ? "active" : ""}`}
-                    onClick={() => setActiveTab("overview")}
-                >
-                    📊 Overview
-                </button>
-                <button
-                    className={`progress-tab ${activeTab === "topics" ? "active" : ""}`}
-                    onClick={() => setActiveTab("topics")}
-                >
-                    📚 Topics
-                </button>
-                <button
-                    className={`progress-tab ${activeTab === "history" ? "active" : ""}`}
-                    onClick={() => setActiveTab("history")}
-                >
-                    📋 History
-                </button>
-                <button
-                    className={`progress-tab ${activeTab === "recommendations" ? "active" : ""}`}
-                    onClick={() => setActiveTab("recommendations")}
-                >
-                    💡 Recommendations
-                </button>
-            </div>
-
-            {/* Tab Content */}
-            {activeTab === "overview" && (
-                <div className="progress-tab-content">
-                    <PerformanceChart trend={trend} />
-
-                    {progress.score_distribution && progress.score_distribution.length > 0 && (
-                        <div className="dash-chart-card fade-in-up">
-                            <h3 className="dash-chart-title">📊 Score Distribution</h3>
-                            <div className="progress-score-dist">
-                                {progress.score_distribution.map((item) => (
-                                    <div key={item.range} className="progress-score-bar-wrap">
-                                        <div className="progress-score-label">
-                                            <span>{item.range}</span>
-                                            <span>{item.count} questions</span>
-                                        </div>
-                                        <div className="progress-score-bar-bg">
-                                            <div
-                                                className="progress-score-bar-fill"
-                                                style={{
-                                                    width: `${Math.min(100, (item.count / Math.max(...progress.score_distribution.map(d => d.count))) * 100)}%`,
-                                                    background: item.range === "8-10" ? "#27ae60" : item.range === "6-7" ? "#3498db" : item.range === "4-5" ? "#f39c12" : "#e74c3c",
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {progress.difficulty_progress && progress.difficulty_progress.length > 0 && (
-                        <div className="dash-chart-card fade-in-up">
-                            <h3 className="dash-chart-title">⚡ Difficulty Breakdown</h3>
-                            <div className="progress-diff-grid">
-                                {progress.difficulty_progress.map((d) => (
-                                    <div key={d.difficulty} className="progress-diff-item">
-                                        <span className={`badge badge-${d.difficulty.toLowerCase()}`}>
-                                            {d.difficulty === "Easy" ? "🟢" : d.difficulty === "Medium" ? "🟡" : "🔴"} {d.difficulty}
-                                        </span>
-                                        <div className="progress-diff-score">{d.average}/10</div>
-                                        <div className="progress-diff-count">{d.count} questions</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {activeTab === "topics" && (
-                <div className="progress-tab-content">
-                    <TopicChart topicPerformance={topicPerf} />
-
-                    {weakTopics.length > 0 && (
-                        <div className="dash-report-section fade-in-up">
-                            <h3 className="dash-report-title" style={{ color: "#e74c3c" }}>🔴 Need Practice</h3>
-                            <div className="progress-topics-list">
-                                {weakTopics.map((topic) => (
-                                    <div key={topic} className="progress-topic-item weak">
-                                        <span>📚 {topic}</span>
-                                        <span className="progress-topic-status poor">Focus Needed</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {strongTopics.length > 0 && (
-                        <div className="dash-report-section fade-in-up">
-                            <h3 className="dash-report-title" style={{ color: "#27ae60" }}>🟢 Strong Areas</h3>
-                            <div className="progress-topics-list">
-                                {strongTopics.map((topic) => (
-                                    <div key={topic} className="progress-topic-item strong">
-                                        <span>📚 {topic}</span>
-                                        <span className="progress-topic-status good">Mastered</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {activeTab === "history" && (
-                <div className="progress-tab-content">
-                    {sessions.length === 0 ? (
-                        <div className="dash-empty-card" style={{ marginTop: 0 }}>
-                            <p>No interview sessions yet.</p>
-                        </div>
-                    ) : (
-                        <div className="progress-sessions-list">
-                            {sessions.map((session) => (
-                                <div key={session.id} className="progress-session-card fade-in-up">
-                                    <div className="progress-session-header">
-                                        <div>
-                                            <strong>{session.role}</strong> — {session.topic}
-                                        </div>
-                                        <span className={`progress-session-score ${session.average_score >= 7 ? "good" : session.average_score >= 5 ? "avg" : "poor"}`}>
-                                            {session.average_score}
-                                        </span>
-                                    </div>
-                                    <div className="progress-session-meta">
-                                        <span>📅 {formatDate(session.created_at)}</span>
-                                        <span>❓ {session.question_count} questions</span>
-                                        <span>{session.completed ? "✅ Completed" : "⏳ In Progress"}</span>
-                                    </div>
-                                    {session.attempts && session.attempts.length > 0 && (
-                                        <details className="progress-session-details">
-                                            <summary>View Questions ({session.attempts.length})</summary>
-                                            <div className="progress-attempts-list">
-                                                {session.attempts.map((attempt) => (
-                                                    <div key={attempt.id} className="progress-attempt-item">
-                                                        <div className="progress-attempt-question">
-                                                            <span className={`score-badge-sm ${attempt.score >= 7 ? "good" : attempt.score >= 5 ? "avg" : "poor"}`}>
-                                                                {attempt.score}
-                                                            </span>
-                                                            {attempt.question_text?.substring(0, 80)}...
-                                                        </div>
-                                                        <div className="progress-attempt-meta">
-                                                            <span className={`badge badge-${(attempt.difficulty || "easy").toLowerCase()}`}>
-                                                                {attempt.difficulty}
-                                                            </span>
-                                                            <span className="progress-attempt-topics">
-                                                                {attempt.expected_topics?.slice(0, 3).join(", ")}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </details>
-                                    )}
-                                </div>
+                <div className="pro-overall-right">
+                    <div className="pro-readiness-badge">
+                        <div className="pro-readiness-stars">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                                <span key={star} className={`pro-star ${star <= (readiness.stars || 1) ? "filled" : ""}`}>★</span>
                             ))}
                         </div>
-                    )}
+                        <div className="pro-readiness-label">{readiness.label || "Getting Started"}</div>
+                        <div className="pro-readiness-level">{readiness.level || "Beginner"}</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ============================================ */}
+            {/* SECTION 3: Performance Overview (Stats Cards)  */}
+            {/* ============================================ */}
+            <div className="pro-section">
+                <h2 className="pro-section-title">📈 Performance Overview</h2>
+                <div className="pro-stats-grid">
+                    <div className="pro-stat-card">
+                        <div className="pro-stat-icon">🎤</div>
+                        <div className="pro-stat-value">{stats.interviews_completed || 0}</div>
+                        <div className="pro-stat-label">Interviews</div>
+                    </div>
+                    <div className="pro-stat-card accent-gold">
+                        <div className="pro-stat-icon">⭐</div>
+                        <div className="pro-stat-value">{stats.average_score || 0}</div>
+                        <div className="pro-stat-label">Avg Score</div>
+                    </div>
+                    <div className="pro-stat-card accent-purple">
+                        <div className="pro-stat-icon">❓</div>
+                        <div className="pro-stat-value">{stats.questions_answered || 0}</div>
+                        <div className="pro-stat-label">Questions</div>
+                    </div>
+                    <div className="pro-stat-card accent-cyan">
+                        <div className="pro-stat-icon">⏱</div>
+                        <div className="pro-stat-value">{stats.practice_time_display || "0m"}</div>
+                        <div className="pro-stat-label">Practice Time</div>
+                    </div>
+                    <div className="pro-stat-card accent-rose">
+                        <div className="pro-stat-icon">💎</div>
+                        <div className="pro-stat-value">{stats.best_score || 0}</div>
+                        <div className="pro-stat-label">Best Score</div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ============================================ */}
+            {/* SECTION 4: Interview History (Table + Chart)  */}
+            {/* ============================================ */}
+            <div className="pro-section">
+                <h2 className="pro-section-title">📅 Interview History</h2>
+                {history.length > 1 && (
+                    <div className="pro-chart-wrapper">
+                        <MiniLineChart data={history} />
+                    </div>
+                )}
+                {history.length > 0 ? (
+                    <div className="pro-history-table-wrap">
+                        <table className="pro-history-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Role</th>
+                                    <th>Topic</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {history.slice(-10).reverse().map((h) => (
+                                    <tr key={h.id}>
+                                        <td>{formatDate(h.date)}</td>
+                                        <td>{h.role}</td>
+                                        <td>{h.topic}</td>
+                                        <td>
+                                            <span className={`pro-score-badge ${h.score >= 7 ? "good" : h.score >= 5 ? "avg" : "poor"}`}>
+                                                {h.score}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <p className="pro-empty-text">No interviews completed yet. Start your first interview!</p>
+                )}
+            </div>
+
+            {/* ============================================ */}
+            {/* SECTION 5: Topic-wise Performance (Bar Chart)  */}
+            {/* ============================================ */}
+            <div className="pro-section">
+                <h2 className="pro-section-title">📚 Topic-wise Performance</h2>
+                {topics.length > 0 ? (
+                    <div className="pro-topic-bars">
+                        {topics.map((t) => (
+                            <div key={t.topic} className="topic-bar-row">
+                                <span className="topic-bar-label">
+                                    {t.icon || "📘"} {t.topic}
+                                </span>
+                                <div className="topic-bar-track">
+                                    <div
+                                        className="topic-bar-fill"
+                                        style={{
+                                            width: `${(t.average / 10) * 100}%`,
+                                            background: getTopicColor(t.status),
+                                        }}
+                                    />
+                                </div>
+                                <span className="topic-bar-score" style={{ color: getTopicColor(t.status) }}>
+                                    {t.average}/10
+                                    <span className="topic-bar-status"> {t.status}</span>
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="pro-empty-text">Answer some questions to see your topic-wise performance.</p>
+                )}
+            </div>
+
+            {/* ============================================ */}
+            {/* SECTION 6: Skill Improvement (Previous vs Current) */}
+            {/* ============================================ */}
+            {skillImp.length > 0 && (
+                <div className="pro-section">
+                    <h2 className="pro-section-title">📊 Skill Improvement</h2>
+                    <div className="pro-skill-grid">
+                        {skillImp.map((s) => (
+                            <div key={s.topic} className={`pro-skill-card trend-${s.trend}`}>
+                                <div className="pro-skill-topic">{s.topic}</div>
+                                <div className="pro-skill-scores">
+                                    <span className="pro-skill-prev">{s.previous}</span>
+                                    <span className="pro-skill-arrow">→</span>
+                                    <span className="pro-skill-curr">{s.current}</span>
+                                    <span className={`pro-skill-change ${s.trend === "up" ? "positive" : s.trend === "down" ? "negative" : ""}`}>
+                                        {s.trend_icon} {s.change > 0 ? "+" : ""}{s.change}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
-            {activeTab === "recommendations" && (
-                <div className="progress-tab-content">
-                    {!recommendations ? (
-                        <div className="dash-empty-card" style={{ marginTop: 0 }}>
-                            <p>Complete more practice to get AI-powered recommendations.</p>
+            {/* ============================================ */}
+            {/* SECTION 7: Strengths                           */}
+            {/* ============================================ */}
+            {strengths.length > 0 && (
+                <div className="pro-section">
+                    <h2 className="pro-section-title" style={{ color: "var(--success)" }}>💪 Strengths</h2>
+                    <div className="pro-tag-list">
+                        {strengths.map((s) => (
+                            <div key={s.topic} className="pro-tag success">
+                                <span className="pro-tag-icon">✔</span>
+                                <span>{s.topic}</span>
+                                <span className="pro-tag-score">{s.score}/10</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================ */}
+            {/* SECTION 8: Areas to Improve                     */}
+            {/* ============================================ */}
+            {weaknesses.length > 0 && (
+                <div className="pro-section">
+                    <h2 className="pro-section-title" style={{ color: "var(--danger)" }}>⚠ Areas to Improve</h2>
+                    <div className="pro-tag-list">
+                        {weaknesses.map((w) => (
+                            <div key={w.topic} className="pro-tag danger">
+                                <span className="pro-tag-icon">⚠</span>
+                                <span>{w.topic}</span>
+                                <span className="pro-tag-score">{w.average}/10</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================ */}
+            {/* SECTION 9: AI Coach Insights                    */}
+            {/* ============================================ */}
+            <div className="pro-section pro-ai-section">
+                <h2 className="pro-section-title">🤖 AI Coach Insights</h2>
+                <div className="pro-ai-card">
+                    <div className="pro-ai-icon">🧠</div>
+                    <p className="pro-ai-text">{aiInsights}</p>
+                </div>
+            </div>
+
+            {/* ============================================ */}
+            {/* SECTION 10: Personalized Study Plan (7-day)     */}
+            {/* ============================================ */}
+            <div className="pro-section">
+                <h2 className="pro-section-title">📅 Personalized Study Plan</h2>
+                <div className="pro-study-plan">
+                    {studyPlan.map((day) => (
+                        <div key={day.day} className="pro-study-day">
+                            <div className="pro-study-day-num">Day {day.day}</div>
+                            <div className="pro-study-day-content">
+                                <div className="pro-study-day-title">{day.title}</div>
+                                <div className="pro-study-day-desc">{day.description}</div>
+                            </div>
                         </div>
-                    ) : (
-                        <>
-                            {/* Priority Topics */}
-                            {recommendations.priority_topics && recommendations.priority_topics.length > 0 && (
-                                <div className="dash-report-section fade-in-up">
-                                    <h3 className="dash-report-title">🎯 Priority Topics</h3>
-                                    <div className="progress-recs-list">
-                                        {recommendations.priority_topics.map((topic, i) => (
-                                            <div key={i} className="progress-rec-item">
-                                                <div className="progress-rec-topic">{topic.topic}</div>
-                                                <div className="progress-rec-reason">{topic.reason}</div>
-                                                {topic.concepts && topic.concepts.length > 0 && (
-                                                    <div className="progress-rec-concepts">
-                                                        {topic.concepts.map((c, j) => (
-                                                            <span key={j} className="progress-rec-concept-badge">{c}</span>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                    ))}
+                </div>
+            </div>
 
-                            {/* Resources */}
-                            {recommendations.resources && recommendations.resources.length > 0 && (
-                                <div className="dash-report-section fade-in-up">
-                                    <h3 className="dash-report-title">📚 Recommended Resources</h3>
-                                    <div className="progress-recs-list">
-                                        {recommendations.resources.map((res, i) => (
-                                            <div key={i} className="progress-rec-item">
-                                                <div className="progress-rec-topic">{res.platform} — {res.title}</div>
-                                                <div className="progress-rec-reason">{res.reason}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Weekly Schedule */}
-                            {recommendations.weekly_schedule && (
-                                <div className="dash-report-section fade-in-up">
-                                    <h3 className="dash-report-title">📅 Weekly Schedule</h3>
-                                    <div className="progress-recs-schedule">{recommendations.weekly_schedule}</div>
-                                </div>
-                            )}
-
-                            {/* Interview Tips */}
-                            {recommendations.interview_tips && recommendations.interview_tips.length > 0 && (
-                                <div className="dash-report-section fade-in-up">
-                                    <h3 className="dash-report-title">💡 Interview Tips</h3>
-                                    <ul className="progress-recs-tips">
-                                        {recommendations.interview_tips.map((tip, i) => (
-                                            <li key={i}>✨ {tip}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-
-                            {/* Readiness Estimate */}
-                            {recommendations.estimated_readiness && (
-                                <div className="dash-report-section fade-in-up">
-                                    <h3 className="dash-report-title">⏱️ Readiness Estimate</h3>
-                                    <div className="progress-recs-readiness">{recommendations.estimated_readiness}</div>
-                                </div>
-                            )}
-                        </>
-                    )}
+            {/* ============================================ */}
+            {/* SECTION 11: Recommended Resources                */}
+            {/* ============================================ */}
+            {resources.length > 0 && (
+                <div className="pro-section">
+                    <h2 className="pro-section-title">📘 Recommended Resources</h2>
+                    <div className="pro-resources-grid">
+                        {resources.map((res, i) => (
+                            <div key={i} className="pro-resource-card">
+                                <div className="pro-resource-topic">{res.topic}</div>
+                                <div className="pro-resource-platform">{res.platform}</div>
+                                <div className="pro-resource-title">{res.title}</div>
+                                <div className="pro-resource-reason">{res.reason}</div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
 
-            <div className="actions" style={{ marginTop: 24 }}>
+            {/* ============================================ */}
+            {/* SECTION 12: Next Goal                          */}
+            {/* ============================================ */}
+            {nextGoal.topic && (
+                <div className="pro-section">
+                    <h2 className="pro-section-title">🎯 Next Goal</h2>
+                    <div className="pro-goal-card">
+                        <div className="pro-goal-topic">{nextGoal.topic}</div>
+                        <div className="pro-goal-progress">
+                            <div className="pro-goal-current">
+                                <span className="pro-goal-label">Current</span>
+                                <span className="pro-goal-value">{nextGoal.current_score}/10</span>
+                            </div>
+                            <div className="pro-goal-bar-bg">
+                                <div className="pro-goal-bar-fill" style={{ width: `${(nextGoal.current_score / nextGoal.target_score) * 100}%` }} />
+                            </div>
+                            <div className="pro-goal-target">
+                                <span className="pro-goal-label">Target</span>
+                                <span className="pro-goal-value">{nextGoal.target_score}/10</span>
+                            </div>
+                        </div>
+                        <div className="pro-goal-meta">
+                            <span>⏱ Estimated: <strong>{nextGoal.estimated_hours} hours</strong></span>
+                            <span className="pro-goal-reason">{nextGoal.reason}</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================ */}
+            {/* SECTION 13: Achievement Badges                   */}
+            {/* ============================================ */}
+            {badges.length > 0 && (
+                <div className="pro-section">
+                    <h2 className="pro-section-title">🏆 Achievement Badges</h2>
+                    <div className="pro-badges-grid">
+                        {badges.map((badge, i) => (
+                            <div key={i} className={`pro-badge-card ${badge.unlocked ? "unlocked" : "locked"}`}>
+                                <div className="pro-badge-icon">{badge.unlocked ? badge.icon : "🔒"}</div>
+                                <div className="pro-badge-name">{badge.name}</div>
+                                <div className="pro-badge-desc">{badge.description}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* ============================================ */}
+            {/* ACTIONS                                       */}
+            {/* ============================================ */}
+            <div className="pro-actions">
                 <button className="btn btn-primary" onClick={() => navigate("/")}>
                     🚀 Start New Interview
                 </button>
                 <button className="btn btn-outline" onClick={() => navigate("/dashboard")}>
-                    📊 Back to Dashboard
+                    📊 View Dashboard
                 </button>
             </div>
         </div>
     );
 }
+
