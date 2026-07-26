@@ -158,7 +158,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Set up environment variables (create .env file)
-# Required: DATABASE_URL, SECRET_KEY, GROQ_API_KEY (or other AI provider key)
+# Required: DATABASE_URL, SECRET_KEY, GEMINI_API_KEY
 
 # Run server
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
@@ -224,7 +224,11 @@ DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/interview
 SECRET_KEY=your-super-secret-key-change-in-production
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=30
-GROQ_API_KEY=your-groq-api-key
+AI_PROVIDER=gemini
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-2.5-flash
+# Optional alternative provider:
+# GROQ_API_KEY=your-groq-api-key
 ```
 
 ## 🧪 Testing

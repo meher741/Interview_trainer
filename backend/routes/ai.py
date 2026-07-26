@@ -1,6 +1,7 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from dependencies import get_current_user
 from services.groq_service import ask_groq
 
 router = APIRouter()
@@ -11,7 +12,7 @@ class PromptRequest(BaseModel):
 
 
 @router.post("/test-ai")
-def test_ai(body: PromptRequest):
+def test_ai(body: PromptRequest, _user=Depends(get_current_user)):
     try:
         response = ask_groq(body.prompt)
         return {"success": True, "data": {"response": response}}

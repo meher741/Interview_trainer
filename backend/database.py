@@ -1,8 +1,17 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base
 import os
 
-DATABASE_URL = "sqlite+aiosqlite:///./interviewiq.db"
+from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import declarative_base
+
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://postgres:password@localhost:5432/interview",
+)
+if not DATABASE_URL.startswith("postgresql+asyncpg://"):
+    raise RuntimeError("DATABASE_URL must use the postgresql+asyncpg:// scheme")
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)

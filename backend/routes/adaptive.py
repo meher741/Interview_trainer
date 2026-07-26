@@ -1,11 +1,12 @@
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
 from models.interview_session import InterviewSession, SessionQuestion
 from services.skill_analyzer import analyze
 from services.question_service import generate_personalized_question
+from dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -29,7 +30,7 @@ class NextQuestionRequest(BaseModel):
 
 
 @router.post("/generate-next-question")
-def generate_next_question(body: NextQuestionRequest):
+def generate_next_question(body: NextQuestionRequest, _user=Depends(get_current_user)):
     try:
         session = InterviewSession(
             role=body.role,

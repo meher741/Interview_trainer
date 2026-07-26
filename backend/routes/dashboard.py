@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
@@ -7,6 +7,7 @@ from models.interview_session import SessionQuestion
 from services.analytics_service import calculate
 from services.report_service import generate_report
 from services.resource_service import recommend_resources
+from dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -28,7 +29,7 @@ class DashboardRequest(BaseModel):
 
 
 @router.post("/dashboard")
-def get_dashboard(body: DashboardRequest):
+def get_dashboard(body: DashboardRequest, _user=Depends(get_current_user)):
     try:
         session_questions = [SessionQuestion(**q.model_dump()) for q in body.questions]
 

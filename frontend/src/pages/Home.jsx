@@ -141,6 +141,8 @@ function Combobox({ label, value, onChange, suggestions, placeholder }) {
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setIsOpen(true)}
+          aria-expanded={isOpen}
+          aria-autocomplete="list"
           onBlur={handleBlur}
           placeholder={placeholder}
           autoComplete="off"
@@ -154,7 +156,10 @@ function Combobox({ label, value, onChange, suggestions, placeholder }) {
                 className={`combobox-option ${idx === highlightedIndex ? "highlighted" : ""}`}
                 role="option"
                 aria-selected={idx === highlightedIndex}
-                onClick={() => handleOptionClick(option)}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleOptionClick(option);
+                }}
                 onMouseEnter={() => setHighlightedIndex(idx)}
               >
                 <span className="option-icon">💡</span>
@@ -193,13 +198,11 @@ export default function Home() {
     try {
       // Start interview session in DB (persistent)
       let sessionId = null;
-      try {
-        const sessionRes = await startInterview(localRole, localTopic);
-        if (sessionRes?.success && sessionRes?.data?.session_id) {
-          sessionId = sessionRes.data.session_id;
-        }
-      } catch (sessionErr) {
-        console.warn("Failed to create interview session (proceeding anyway):", sessionErr);
+      const sessionRes = await startInterview(localRole, localTopic);
+      if (sessionRes?.success && sessionRes?.data?.session_id) {
+        sessionId = sessionRes.data.session_id;
+      } else {
+        throw new Error("Unable to create a persistent interview session.");
       }
 
       // Generate first question

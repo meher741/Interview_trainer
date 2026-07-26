@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional
@@ -8,7 +8,7 @@ from sqlalchemy import select
 from database import get_db
 from models.user import User
 from models.interview_models import InterviewSession as DBSession, QuestionAttempt
-from auth_utils import decode_token
+from dependencies import get_current_user
 from services.analytics_service import (
     get_user_stats,
     get_topic_performance,
@@ -26,22 +26,6 @@ from services.progress_v2_service import get_comprehensive_progress
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-
-async def get_current_user(request: Request, db: AsyncSession = Depends(get_db)):
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(401, "Not authenticated")
-    token = auth_header.split(" ")[1]
-    payload = decode_token(token)
-    if not payload or payload.get("type") != "access":
-        raise HTTPException(401, "Invalid token")
-    email = payload.get("sub")
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(401, "User not found")
-    return user
 
 
 class StartSessionRequest(BaseModel):
@@ -83,6 +67,16 @@ async def start_interview(body: StartSessionRequest, user: User = Depends(get_cu
 @router.post("/interview/save")
 async def save_attempt_route(body: SaveAttemptRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
+        if body.session_id:
+            session_result = await db.execute(
+                select(DBSession).where(
+                    DBSession.id == body.session_id,
+                    DBSession.user_email == user.email,
+                )
+            )
+            if not session_result.scalar_one_or_none():
+                raise HTTPException(status_code=404, detail="Interview session not found")
+
         result = await save_attempt(
             db=db,
             user_email=user.email,
@@ -110,7 +104,7 @@ async def save_attempt_route(body: SaveAttemptRequest, user: User = Depends(get_
 @router.post("/interview/finish")
 async def finish_interview_route(body: FinishSessionRequest, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     try:
-        session = await finish_session(db, body.session_id)
+        session = await finish_session(db, body.session_id, user.email)
         if not session:
             return JSONResponse(status_code=404, content={"success": False, "message": "Session not found"})
         return {

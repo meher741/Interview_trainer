@@ -1,19 +1,54 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://127.0.0.1:8000",
+  baseURL: import.meta.env.VITE_API_URL || "http://127.0.0.1:8000",
+  withCredentials: true,
 });
 
-let accessToken = null;
-
 export function setAccessToken(token) {
-  accessToken = token;
   if (token) {
     api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
   } else {
     delete api.defaults.headers.common["Authorization"];
   }
 }
+
+let refreshPromise = null;
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const request = error.config;
+    if (
+      error.response?.status !== 401 ||
+      !request ||
+      request._retry ||
+      request.url?.includes("/auth/refresh") ||
+      request.url?.includes("/auth/login") ||
+      request.url?.includes("/auth/signup")
+    ) {
+      return Promise.reject(error);
+    }
+
+    request._retry = true;
+    refreshPromise ??= api.post("/auth/refresh").then(({ data }) => {
+      setAccessToken(data.access_token);
+      return data.access_token;
+    }).finally(() => {
+      refreshPromise = null;
+    });
+
+    try {
+      const token = await refreshPromise;
+      request.headers = request.headers || {};
+      request.headers.Authorization = `Bearer ${token}`;
+      return api(request);
+    } catch (refreshError) {
+      setAccessToken(null);
+      return Promise.reject(refreshError);
+    }
+  },
+);
 
 export async function signup(email, password) {
   const { data } = await api.post("/auth/signup", { email, password });

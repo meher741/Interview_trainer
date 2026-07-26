@@ -143,9 +143,12 @@ async def save_attempt(
     return {"attempt_id": attempt.id, "session_id": session_id}
 
 
-async def finish_session(db: AsyncSession, session_id: str):
+async def finish_session(db: AsyncSession, session_id: str, user_email: str):
     result = await db.execute(
-        select(DBSession).where(DBSession.id == session_id)
+        select(DBSession).where(
+            DBSession.id == session_id,
+            DBSession.user_email == user_email,
+        )
     )
     session = result.scalar_one_or_none()
     if not session:

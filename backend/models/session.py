@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, DateTime, func, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 class Session(Base):
@@ -18,8 +18,11 @@ class Session(Base):
     @classmethod
     def create(cls, user_email: str, days: int = 7) -> "Session":
         session = cls(user_email=user_email)
-        session.expires_at = datetime.utcnow() + timedelta(days=days)
+        session.expires_at = datetime.now(timezone.utc) + timedelta(days=days)
         return session
 
     def is_valid(self) -> bool:
-        return datetime.utcnow() < self.expires_at
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) < expires_at

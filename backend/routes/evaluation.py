@@ -1,14 +1,15 @@
 import logging
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from services.evaluation_service import evaluate_answer as evaluate
+from dependencies import get_current_user
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 @router.post("/evaluate-answer")
-def evaluate_answer(body: dict):
+def evaluate_answer(body: dict, _user=Depends(get_current_user)):
     try:
         question = body.get("question")
         expected_topics = body.get("expected_topics", [])

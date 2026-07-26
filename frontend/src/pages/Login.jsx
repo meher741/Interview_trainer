@@ -21,7 +21,8 @@ const Login = () => {
       await login(email, password);
       navigate("/");
     } catch (err) {
-      setError(err.message);
+      const serverMessage = err?.response?.data?.detail || err?.response?.data?.message;
+      setError(serverMessage || (err?.request ? "Unable to reach the server. Please try again." : err.message));
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,7 @@ const Login = () => {
               disabled={loading}
             />
           </div>
-          {error && <div className="error-box shake">{error}</div>}
+          {error && <div className="error-box shake" role="alert" aria-live="polite">{error}</div>}
           <button type="submit" className="btn btn-primary btn-block" disabled={loading}>
             {loading ? (
               <>
